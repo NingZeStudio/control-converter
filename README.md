@@ -4,6 +4,8 @@ Convert control-layout JSON between [Zalith Launcher 2](https://github.com/Zalit
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.8%2B-blue)](https://www.python.org/)
+[![Demo](https://img.shields.io/badge/demo-cc.miawa.cn-9cf)](https://cc.miawa.cn)
+[![API](https://img.shields.io/badge/api-api.cc.miawa.cn-orange)](https://api.cc.miawa.cn)
 
 ## Quick Start
 
@@ -23,11 +25,13 @@ Zero dependencies. Python 3.8+ standard library only.
 ## Install
 
 ```bash
-git clone https://github.com/leemwood/control-converter.git
+git clone https://github.com/NingZeStudio/control-converter.git
 cd control-converter
 ```
 
 No `pip install` needed. Just run `python cc.py`.
+
+**Try it online**: [cc.miawa.cn](https://cc.miawa.cn) -- web-based converter. API at [api.cc.miawa.cn](https://api.cc.miawa.cn).
 
 ## What It Does
 
