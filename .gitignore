@@ -1,0 +1,14 @@
+# Nuitka build artifacts
+dist/cc.build/
+dist/cc.dist/
+dist/cc.onefile-build/
+
+# Python
+__pycache__/
+*.pyc
+
+# Qwen Code
+.qwen/
+
+# Crash reports
+nuitka-crash-report.xml
