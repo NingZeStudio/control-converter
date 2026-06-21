@@ -1,133 +1,62 @@
-# Binary Build Guide (Android / Termux)
+# Binary Build Guide (Android JNI)
 
-`cc.py` 已通过 [Nuitka](https://nuitka.net/) 编译为 Android aarch64 原生二进制文件 `dist/cc`（约 24 MB，单文件、免依赖）。
+`cc.py` 的转换逻辑已用 [Go](https://go.dev/) 重写，并通过 `c-shared` 构建模式编译为 Android aarch64 JNI 共享库 `dist/libcc.so`（约 4 MB）。
 
-## 快速使用
+## 架构
+
+```
+Java (LayoutConverter.java)
+  └─ System.loadLibrary("cc")
+     └─ JNI: Java_com_tungsten_fcl_util_LayoutConverter_convertFclToZl2Native
+        └─ Go: convertFCLToZL()  (fcl_to_zl.go)
+```
+
+- **入口**：`go/main.go` 中的 `//export` JNI 函数
+- **转换逻辑**：`go/fcl_to_zl.go`（从 `cc.py` 完整移植）
+- **输出**：与 Python 版 100% 一致
+
+## 自行编译
+
+### 依赖
+
+- [Go 1.21+](https://go.dev/dl/)
+- [Android NDK r25+](https://developer.android.com/ndk/downloads)
+
+### 编译命令
 
 ```bash
-# 直接运行（无需 Python 环境）
-./dist/cc --help
+cd control-converter/go
 
-# ZL → FCL
-./dist/cc zl2fcl input.json output.json
+# 设置 NDK 编译器路径（按实际 NDK 版本调整）
+export NDK_ROOT=/path/to/android-ndk
+export CC=$NDK_ROOT/toolchains/llvm/prebuilt/<host>/bin/aarch64-linux-android21-clang
 
-# FCL → ZL
-./dist/cc fcl2zl input.json output.json --lossless
-
-# 自动检测格式
-./dist/cc auto input.json output.json
-
-# 启动 API 服务器
-./dist/cc api --host 0.0.0.0 --port 8000
+# 交叉编译 c-shared 库
+CGO_ENABLED=1 GOOS=android GOARCH=arm64 \
+  go build -buildmode=c-shared -o ../dist/libcc.so .
 ```
 
-## 自行动手编译
+编译产物：
+- `dist/libcc.so` — Android aarch64 JNI 共享库
+- `dist/libcc.h` — C 头文件（JNI 函数声明，仅供参考）
 
-### 依赖安装（Termux）
+### 打包到 FCL
+
+将 `dist/libcc.so` 复制到 FCL 项目的 jniLibs 目录：
 
 ```bash
-pkg install python clang patchelf termux-elf-cleaner make -y
-pip install nuitka
+cp dist/libcc.so /path/to/FoldCraftLauncher/FCL/src/main/jniLibs/arm64-v8a/libcc.so
 ```
 
-### 一键编译
+Android 系统安装 APK 时会自动释放到 `nativeLibraryDir` 并赋予执行权限，Java 通过 `System.loadLibrary("cc")` 加载。
+
+## Python 版本
+
+原始 Python 实现 `cc.py` 仍保留，可用于：
+- 命令行批量转换
+- Web API 服务
+- 回归测试参照
 
 ```bash
-cd control-converter
-
-# 创建 ldd 替代（Nuitka 需要，但 Android 无原生 ldd）
-cat > /data/data/com.termux/files/usr/bin/ldd << 'EOF'
-#!/data/data/com.termux/files/usr/bin/python3
-"""ldd replacement for Termux/Android."""
-import subprocess, sys, os, re
-
-LIB_PATHS = [
-    '/data/data/com.termux/files/usr/lib',
-    '/system/lib64',
-    '/system/lib',
-]
-
-def find_lib(name):
-    for p in LIB_PATHS:
-        candidate = os.path.join(p, name)
-        if os.path.exists(candidate):
-            return candidate
-    return None
-
-for f in sys.argv[1:]:
-    if not os.path.isfile(f):
-        continue
-    try:
-        out = subprocess.check_output(['readelf', '-d', f], stderr=subprocess.DEVNULL).decode()
-        needed = re.findall(r'Shared library:\s*\[(.+?)\]', out)
-        for lib in needed:
-            found = find_lib(lib)
-            if found:
-                print(f'\t{lib} => {found} (0x0000000000000000)')
-            else:
-                print(f'\t{lib} => not found')
-    except Exception:
-        pass
-EOF
-chmod +x /data/data/com.termux/files/usr/bin/ldd
-
-# 编译
-python3 -m nuitka --onefile --output-dir=dist --output-filename=cc cc.py
-```
-
-编译完成后，二进制文件位于 `dist/cc`，可直接分发到其他 Android 设备使用。
-
-### 清理
-
-```bash
-rm -rf dist/cc.build dist/cc.dist dist/cc.onefile-build
-```
-
-## 二进制与 Python 脚本对比
-
-| 特性 | `python cc.py` | `./dist/cc` |
-|------|---------------|-------------|
-| 需要 Python | 是 | 否 |
-| 文件大小 | ~100 KB | ~24 MB |
-| 启动速度 | 快 | 更快（预编译） |
-| 分发便捷 | 需 Python 3.8+ | 单文件、免依赖 |
-| 支持平台 | 全平台 | Android aarch64 |
-
-## 完整 CLI 选项
-
-```
-用法: cc <模式> [输入] [输出] [选项]
-
-模式:
-  auto      自动检测格式并转换
-  zl2fcl    Zalith Launcher 2 → FoldCraftLauncher
-  fcl2zl    FoldCraftLauncher → Zalith Launcher 2
-  api       启动 HTTP API 服务器
-
-选项:
-  --include-directions     将 FCL 方向控制近似为 ZL 按钮网格
-  --lossless, --no-drop    替换不支持的控件而非丢弃
-  --absolute-as-percentage 将绝对 dp 尺寸转为百分比尺寸
-  --strict                 不支持的字段报错而非警告
-  --compact                输出紧凑 JSON
-  --strip-meta             去除元数据
-  --usable                 ZL→FCL 安全可用模式
-  --aspect 16/9            屏幕宽高比（默认 1.778）
-  --host HOST              API 服务器地址
-  --port PORT              API 服务器端口
-```
-
-## API 模式
-
-```bash
-# 启动服务器
-./dist/cc api --host 0.0.0.0 --port 8000
-
-# POST /convert
-curl -X POST http://localhost:8000/convert \
-  -H 'Content-Type: application/json' \
-  -d '{"mode":"zl2fcl","data":{...}}'
-
-# 健康检查
-curl http://localhost:8000/health
+python cc.py fcl2zl input.json output.json --lossless
 ```
