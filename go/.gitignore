@@ -1,0 +1,5 @@
+# Windows test binary
+cc.exe
+
+# Go build cache
+*.exe~
