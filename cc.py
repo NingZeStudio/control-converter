@@ -482,7 +482,7 @@ from typing import Any
 from urllib.parse import parse_qs, urlparse
 
 FCL_CONTROLLER_VERSION = 21
-ZL_EDITOR_VERSION = 11
+ZL_EDITOR_VERSION = 12
 META_KEY = "_control_byIQge报错别找我"
 META_SCHEMA_VERSION = 1
 
@@ -1135,9 +1135,27 @@ def fcl_rocker_style_to_zl_joystick(style: dict[str, Any]) -> dict[str, Any]:
         "joystickSize": fcl_ratio_to_zl(rocker.get("rockerSize", 500)),
     })
     return {
+        "name": str((style or {}).get("name") or "Default"),
         "uuid": short_id(),
+        "commonStyle": True,
         "lightStyle": config,
         "darkStyle": dict(config),
+    }
+
+
+def zl_joystick_style_to_fcl_rocker(style: dict[str, Any]) -> dict[str, Any]:
+    """Convert a ZL joystick style back to an FCL rockerStyle (reverse of fcl_rocker_style_to_zl_joystick)."""
+    light = (style or {}).get("lightStyle") or {}
+    return {
+        "rockerSize": max(100, min(1000, round(clamp_range(light.get("joystickSize"), 0.0, 1.0, 0.5) * 1000))),
+        "bgCornerRadius": max(0, min(500, clamp_int(light.get("backgroundShape", 50)) * 10)),
+        "bgStrokeWidth": max(0, min(500, clamp_int(light.get("borderWidthRatio", 0)) * 10)),
+        "bgStrokeColor": zl_color_to_fcl(light.get("borderColor"), -12303292),
+        "bgFillColor": zl_color_to_fcl(light.get("backgroundColor"), 0, light.get("alpha", 1.0)),
+        "rockerCornerRadius": max(0, min(500, clamp_int(light.get("joystickShape", 50)) * 10)),
+        "rockerStrokeWidth": 10,
+        "rockerStrokeColor": zl_color_to_fcl(light.get("joystickColor"), -12303292),
+        "rockerFillColor": zl_color_to_fcl(light.get("joystickColor"), -7829368, light.get("alpha", 1.0)),
     }
 
 
@@ -1391,7 +1409,7 @@ def normalize_zl_click_events(events: list[dict[str, str]]) -> list[dict[str, st
 def normalize_zl_layout(layout: dict[str, Any]) -> dict[str, Any]:
     """Fill fields required by current ZL kotlinx models without changing semantics."""
     result = deep_copy_json(layout)
-    result.setdefault("special", {})
+    result.setdefault("joystickStyles", [])
     for layer in result.get("layers") or []:
         if not isinstance(layer, dict):
             continue
@@ -1400,6 +1418,7 @@ def normalize_zl_layout(layout: dict[str, Any]) -> dict[str, Any]:
         layer.setdefault("hideWhenJoystick", False)
         layer.setdefault("normalButtons", [])
         layer.setdefault("textBoxes", [])
+        layer.setdefault("joystickButtons", [])
     return result
 
 
@@ -1746,10 +1765,164 @@ def infer_visible_companion_layers(data: dict[str, Any], layer_id_map: dict[str,
     return companions
 
 
+def make_direction_base_info_from_zl(joystick: dict[str, Any], layer_visibility: str) -> dict[str, Any]:
+    """Build an FCL ControlDirection baseInfo from a ZL JoystickData.
+
+    ZL joysticks are square; FCL directions are square views too, so width and
+    height share one value. ZL percentage size is relative to screen height
+    (JoystickData.toButtonSize uses ScreenHeight references), which matches an
+    FCL SCREEN_HEIGHT reference directly.
+    """
+    size_type = str(joystick.get("sizeType") or "Percentage").lower()
+    if size_type in ("dp", "dip", "absolute"):
+        fcl_size_type = "ABSOLUTE"
+        absolute = max(5, clamp_int(joystick.get("sizeDp"), 50))
+        percentage = 300
+    else:
+        fcl_size_type = "PERCENTAGE"
+        absolute = max(5, clamp_int(joystick.get("sizeDp"), 50))
+        percentage = max(100, min(1000, clamp_int(joystick.get("sizePercentage", 2500)) // 10))
+    visibility = visibility_zl_to_fcl(joystick.get("visibilityType") or layer_visibility)
+    return {
+        "visibilityType": visibility,
+        "xPosition": scale_position_to_fcl((joystick.get("position") or {}).get("x", 0)),
+        "yPosition": scale_position_to_fcl((joystick.get("position") or {}).get("y", 0)),
+        "sizeType": fcl_size_type,
+        "absoluteWidth": absolute,
+        "absoluteHeight": absolute,
+        "percentageWidth": {"reference": "SCREEN_HEIGHT", "size": percentage},
+        "percentageHeight": {"reference": "SCREEN_HEIGHT", "size": percentage},
+    }
+
+
+def overlay_shared_fields_fcl_direction(original: dict[str, Any], joystick: dict[str, Any], layer_visibility: str, strict: bool) -> dict[str, Any]:
+    """Restore an original FCL direction, overlaying the current ZL joystick geometry."""
+    restored = deep_copy_json(original)
+    restored["id"] = str(joystick.get("uuid") or restored.get("id") or fcl_id())
+    restored["baseInfo"] = make_direction_base_info_from_zl(joystick, layer_visibility)
+    return restored
+
+
+def zl_joystick_to_fcl_direction(
+    joystick: dict[str, Any],
+    layer_visibility: str,
+    strict: bool,
+    style_name: str,
+) -> dict[str, Any]:
+    """Convert a ZL JoystickData back to an FCL ControlDirection (ROCKER style)."""
+    original = meta_original(joystick, "fcl", "direction")
+    if original is not None:
+        restored = overlay_shared_fields_fcl_direction(original, joystick, layer_visibility, strict)
+        return set_meta(restored, make_meta("zl", "joystick", str(joystick.get("uuid") or restored.get("id") or fcl_id()), joystick))
+
+    direction_events = joystick.get("directionEvents") or {}
+
+    def keycodes_for(name: str) -> list[int]:
+        keycodes: list[int] = []
+        for event in direction_events.get(name) or []:
+            if not isinstance(event, dict) or event.get("type") != "key":
+                continue
+            keycode = convert_key_to_fcl(str(event.get("key") or ""), strict)
+            if keycode is not None:
+                keycodes.append(keycode)
+        return keycodes
+
+    direction_obj = {
+        "id": str(joystick.get("uuid") or fcl_id()),
+        "baseInfo": make_direction_base_info_from_zl(joystick, layer_visibility),
+        "event": {
+            "upKeycode": keycodes_for("north"),
+            "downKeycode": keycodes_for("south"),
+            "leftKeycode": keycodes_for("west"),
+            "rightKeycode": keycodes_for("east"),
+        },
+        "style": style_name,
+    }
+    return set_meta(direction_obj, make_meta("zl", "joystick", str(joystick.get("uuid") or direction_obj["id"]), joystick))
+
+
+def fcl_rocker_style_matches(rocker_a: dict[str, Any], rocker_b: dict[str, Any]) -> bool:
+    """Return True when two FCL rockerStyle objects are semantically equal.
+
+    ZL joystick styles cannot represent rockerStrokeColor/rockerStrokeWidth
+    (ZL has a single joystickColor), so those fields are ignored when matching
+    to reuse an existing FCL ROCKER direction style on round-trips.
+    """
+    comparable = ("rockerSize", "bgCornerRadius", "bgStrokeWidth", "bgStrokeColor",
+                  "bgFillColor", "rockerCornerRadius", "rockerFillColor")
+    for key in comparable:
+        if (rocker_a or {}).get(key) != (rocker_b or {}).get(key):
+            return False
+    return True
+
+
+def zl_joystick_styles_to_fcl_direction_styles(
+    joystick_styles: list[dict[str, Any]],
+    existing_styles: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], dict[str, str]]:
+    """Convert ZL joystick styles into FCL ROCKER direction styles.
+
+    Returns (styles_to_append, joystick_style_uuid -> FCL style name).
+    When a joystick style was generated from an FCL ROCKER style (converter
+    metadata) or matches an existing ROCKER direction style, the existing
+    style is reused instead of appending a duplicate.
+    """
+    result: list[dict[str, Any]] = []
+    mapping: dict[str, str] = {}
+    used_names = {str(style.get("name")) for style in existing_styles or [] if isinstance(style, dict)}
+    existing_by_name = {
+        str(style.get("name")): style for style in existing_styles or []
+        if isinstance(style, dict) and str(style.get("styleType")) == "ROCKER"
+    }
+    existing_rockers = list(existing_by_name.values())
+    default_button_style = (default_fcl_direction_style().get("buttonStyle") or {})
+    for style in joystick_styles or []:
+        if not isinstance(style, dict):
+            continue
+        uuid_value = str(style.get("uuid") or "")
+        base_name = str(style.get("name") or uuid_value or "Joystick")
+        converted_rocker = zl_joystick_style_to_fcl_rocker(style)
+        matched_name = ""
+        original_style = meta_original(style, "fcl", "directionStyle")
+        if isinstance(original_style, dict):
+            candidate = str(original_style.get("name") or "")
+            if candidate in existing_by_name:
+                matched_name = candidate
+        if not matched_name:
+            for existing in existing_rockers:
+                if fcl_rocker_style_matches(converted_rocker, existing.get("rockerStyle")):
+                    matched_name = str(existing.get("name") or "")
+                    break
+        if matched_name:
+            mapping[uuid_value] = matched_name
+            continue
+        name = style_name_for_zl_style(base_name, uuid_value)
+        suffix = 2
+        while name in used_names:
+            name = f"{style_name_for_zl_style(base_name, uuid_value)}_{suffix}"
+            suffix += 1
+        used_names.add(name)
+        if uuid_value:
+            mapping[uuid_value] = name
+        result.append({
+            "name": name,
+            "styleType": "ROCKER",
+            "buttonStyle": deep_copy_json(default_button_style),
+            "rockerStyle": converted_rocker,
+        })
+    return result, mapping
+
+
 def zl_to_fcl(data: dict[str, Any], strict: bool = False) -> dict[str, Any]:
     root_original = meta_original(data, "fcl", "controller")
     info = data.get("info") or {}
     styles, style_map = zl_styles_to_fcl(data.get("styles") or [])
+    existing_direction_styles = deep_copy_json((root_original or {}).get("directionStyles") or [])
+    if not existing_direction_styles:
+        existing_direction_styles = [default_fcl_direction_style()]
+    joystick_style_styles, joystick_style_names = zl_joystick_styles_to_fcl_direction_styles(
+        data.get("joystickStyles") or [], existing_direction_styles
+    )
     view_groups = []
 
     layer_id_map: dict[str, str] = {}
@@ -1782,6 +1955,23 @@ def zl_to_fcl(data: dict[str, Any], strict: bool = False) -> dict[str, Any]:
         )
         restored_group = deep_copy_json(layer_original) if layer_original is not None else {}
         direction_list = (((restored_group.get("viewData") or {}).get("directionList")) if isinstance(restored_group.get("viewData"), dict) else None) or []
+        direction_list = [deep_copy_json(item) for item in direction_list]
+        restored_direction_ids = {str(item.get("id") or "") for item in direction_list if isinstance(item, dict)}
+        for joystick in layer.get("joystickButtons") or []:
+            if not isinstance(joystick, dict):
+                continue
+            joystick_original = meta_original(joystick, "fcl", "direction")
+            if joystick_original is not None and str(joystick_original.get("id") or "") in restored_direction_ids:
+                # Already restored via the layer's original directionList (same
+                # dedupe as direction-grid buttons in zl_button_to_fcl).
+                continue
+            style_name = joystick_style_names.get(str(joystick.get("joystickStyleId") or ""))
+            if not style_name:
+                warn(f"ZL joystick on layer {layer.get('name')!r} references unknown joystickStyleId; using ROCKER style from its style definition", strict, once=True)
+                style_name = "ZL Joystick"
+            converted_direction = zl_joystick_to_fcl_direction(joystick, layer_visibility, strict, style_name)
+            if converted_direction is not None:
+                direction_list.append(converted_direction)
         result_group = {
             "id": str(layer.get("uuid") or restored_group.get("id") or fcl_id()),
             "name": str(layer.get("name") or restored_group.get("name") or "Layer"),
@@ -1809,7 +1999,7 @@ def zl_to_fcl(data: dict[str, Any], strict: bool = False) -> dict[str, Any]:
         "description": text_default(info.get("description")) or str(result.get("description") or ""),
         "controllerVersion": clamp_int(result.get("controllerVersion"), FCL_CONTROLLER_VERSION),
         "buttonStyles": styles,
-        "directionStyles": deep_copy_json(result.get("directionStyles") or [default_fcl_direction_style()]),
+        "directionStyles": deep_copy_json(existing_direction_styles + joystick_style_styles),
         "viewGroups": order_fcl_view_groups(view_groups),
     })
     return set_meta(result, make_meta("zl", "layout", str(data.get("id") or result["id"]), data))
@@ -2558,6 +2748,99 @@ def direction_to_zl_buttons(
     return buttons
 
 
+def direction_view_size(base: dict[str, Any], aspect: float) -> int:
+    """Pixel size of the square FCL direction view (mirrors fcl_direction_rect_to_zl_grid)."""
+    if base.get("sizeType") == "ABSOLUTE":
+        return max(1, clamp_int(base.get("absoluteWidth"), 50))
+    screen_h = 10000.0
+    screen_w = screen_h * max(0.1, clamp_float(aspect, 16 / 9))
+    pw = base.get("percentageWidth") or {}
+    reference = pw.get("reference") or "SCREEN_WIDTH"
+    reference_size = screen_h if reference == "SCREEN_HEIGHT" else screen_w
+    return max(1, int(reference_size * clamp_int(pw.get("size", 100)) / 1000.0))
+
+
+def zl_key_events_from_keycodes(keycodes: list[Any], strict: bool) -> list[dict[str, str]]:
+    events: list[dict[str, str]] = []
+    for keycode in keycodes:
+        converted = convert_key_to_zl(clamp_int(keycode), strict)
+        if converted:
+            etype, key = converted
+            events.append({"type": etype, "key": key})
+    return events
+
+
+def direction_to_zl_joystick(
+    direction: dict[str, Any],
+    style: dict[str, Any],
+    joystick_style_uuid: str,
+    strict: bool,
+    aspect: float,
+) -> dict[str, Any]:
+    """Convert an FCL ROCKER direction control to a ZL joystick control (JoystickData).
+
+    ZL v12 added native joystick controls (layer.joystickButtons + layout.joystickStyles),
+    so an FCL ROCKER now maps 1:1 instead of being approximated as an 8-way button grid.
+    """
+    base = direction.get("baseInfo") or {}
+    event = direction.get("event") or {}
+    widget_x, widget_y, _size, _p0, _p1, _p2, screen_w, screen_h, _reference, _button_size, _child_px = fcl_direction_rect_to_zl_grid(direction, style, aspect, joined=True)
+    absolute = base.get("sizeType") == "ABSOLUTE"
+    view_size = direction_view_size(base, aspect)
+    up_keys = direction_event_keycodes(event, "upKeycode", GLFW_TO_FCL["GLFW_KEY_W"])
+    down_keys = direction_event_keycodes(event, "downKeycode", GLFW_TO_FCL["GLFW_KEY_S"])
+    left_keys = direction_event_keycodes(event, "leftKeycode", GLFW_TO_FCL["GLFW_KEY_A"])
+    right_keys = direction_event_keycodes(event, "rightKeycode", GLFW_TO_FCL["GLFW_KEY_D"])
+    up = zl_key_events_from_keycodes(up_keys, strict)
+    down = zl_key_events_from_keycodes(down_keys, strict)
+    left = zl_key_events_from_keycodes(left_keys, strict)
+    right = zl_key_events_from_keycodes(right_keys, strict)
+
+    if absolute:
+        size_type = "Dp"
+        size_dp = clamp_zl_dp(view_size)
+        size_percentage = 2500
+    else:
+        size_type = "Percentage"
+        size_percentage = max(2000, min(10000, round(view_size / screen_h * 10000)))
+        size_dp = 200.0
+
+    joystick_obj = {
+        "uuid": short_id() + short_id()[:6],
+        "position": {
+            "x": pixel_to_zl_position(round(widget_x), screen_w, float(view_size)),
+            "y": pixel_to_zl_position(round(widget_y), screen_h, float(view_size)),
+        },
+        "sizeType": size_type,
+        "sizeDp": size_dp,
+        "sizePercentage": size_percentage,
+        "visibilityType": visibility_fcl_to_zl(base.get("visibilityType")),
+        "joystickStyleId": joystick_style_uuid,
+        "deadZoneRatio": 0.5,
+        "lockThreshold": 0.3,
+        "canLock": True,
+        "triggerMode": "drag",
+        "directionEvents": {
+            "north": up,
+            "north_east": up + right,
+            "north_west": up + left,
+            "south": down,
+            "south_east": down + right,
+            "south_west": down + left,
+            "east": right,
+            "west": left,
+        },
+        "lockEvents": [],
+    }
+    return set_meta(joystick_obj, make_meta(
+        "fcl",
+        "direction",
+        str(direction.get("id") or joystick_obj["uuid"]),
+        direction,
+        {"synthetic": True, "generatedFrom": "direction-joystick"},
+    ))
+
+
 def fcl_to_zl(data: dict[str, Any], include_directions: bool = False, strict: bool = False, aspect: float = 16 / 9, lossless: bool = False, absolute_as_percentage: bool = False) -> dict[str, Any]:
     include_directions = include_directions or lossless
     root_original = meta_original(data, "zl", "layout")
@@ -2565,7 +2848,11 @@ def fcl_to_zl(data: dict[str, Any], include_directions: bool = False, strict: bo
     direction_styles = direction_style_map(data.get("directionStyles") or [default_fcl_direction_style()])
     default_style_uuid = next(iter(style_map.values()), None)
     layers = []
-    special: dict[str, Any] = deep_copy_json((root_original or {}).get("special") or {})
+    joystick_styles: list[dict[str, Any]] = deep_copy_json((root_original or {}).get("joystickStyles") or [])
+    joystick_style_uuids: dict[str, str] = {}
+    for js in joystick_styles:
+        if isinstance(js, dict) and js.get("name"):
+            joystick_style_uuids.setdefault(str(js.get("name")), str(js.get("uuid") or ""))
     warned_joystick_settings = False
     group_ids_by_name = {
         str(group.get("name") or "Layer"): str(group.get("id") or "")
@@ -2638,6 +2925,7 @@ def fcl_to_zl(data: dict[str, Any], include_directions: bool = False, strict: bo
                     ))
         directions = view_data.get("directionList") or []
         direction_buttons: list[dict[str, Any]] = []
+        joystick_buttons: list[dict[str, Any]] = []
         if directions and not include_directions:
             warn(f"skipped {len(directions)} FCL direction control(s) in group {group.get('name')!r}; use --include-directions to convert them", strict)
         if include_directions:
@@ -2645,13 +2933,23 @@ def fcl_to_zl(data: dict[str, Any], include_directions: bool = False, strict: bo
                 direction_style = resolve_direction_style(direction, direction_styles)
                 is_rocker = direction_style.get("styleType") == "ROCKER"
                 if is_rocker:
-                    if "joystickStyle" not in special:
-                        special["joystickStyle"] = fcl_rocker_style_to_zl_joystick(direction_style)
+                    style_name = str(direction_style.get("name") or "Default")
+                    style_uuid = joystick_style_uuids.get(style_name)
+                    if not style_uuid:
+                        joystick_style = fcl_rocker_style_to_zl_joystick(direction_style)
+                        style_uuid = joystick_style["uuid"]
+                        joystick_style_uuids[style_name] = style_uuid
+                        joystick_styles.append(set_meta(
+                            joystick_style,
+                            make_meta("fcl", "directionStyle", style_name, direction_style),
+                        ))
                     if not warned_joystick_settings:
-                        warn("converted FCL ROCKER style to ZL special.joystickStyle and approximated rocker controls as 8-way button grid", strict)
+                        warn("converted FCL ROCKER style to ZL joystickStyles and rocker controls to ZL joystickButtons (ZL editor v12)", strict)
                         warned_joystick_settings = True
+                    joystick_buttons.append(direction_to_zl_joystick(direction, direction_style, style_uuid, strict, aspect))
+                else:
+                    direction_buttons.extend(direction_to_zl_buttons(direction, direction_style, default_style_uuid, strict, aspect, joined=False))
                 _SUBSTITUTION_COUNTS["directions"] += 1
-                direction_buttons.extend(direction_to_zl_buttons(direction, direction_style, default_style_uuid, strict, aspect, joined=is_rocker))
         buttons.sort(key=lambda button: fcl_button_area_ratio({"baseInfo": {
             "xPosition": (button.get("position") or {}).get("x", 0) / 10,
             "yPosition": (button.get("position") or {}).get("y", 0) / 10,
@@ -2672,6 +2970,7 @@ def fcl_to_zl(data: dict[str, Any], include_directions: bool = False, strict: bo
             "visibilityType": str(layer_obj.get("visibilityType") or "always"),
             "normalButtons": buttons,
             "textBoxes": text_boxes,
+            "joystickButtons": joystick_buttons,
         })
         layers.append(set_meta(layer_obj, make_meta("fcl", "viewGroup", str(group.get("id") or layer_obj["uuid"]), group)))
 
@@ -2699,10 +2998,9 @@ def fcl_to_zl(data: dict[str, Any], include_directions: bool = False, strict: bo
         },
         "layers": layers,
         "styles": deep_copy_json((result.get("styles") if isinstance(result.get("styles"), list) and result.get("styles") else styles)),
+        "joystickStyles": joystick_styles,
         "editorVersion": clamp_int(result.get("editorVersion"), ZL_EDITOR_VERSION),
     })
-    if special:
-        result["special"] = special
     return set_meta(result, make_meta("fcl", "controller", str(data.get("id") or result.get("info", {}).get("name") or short_id()), data))
 
 

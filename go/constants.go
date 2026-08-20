@@ -2,7 +2,7 @@ package main
 
 const (
 	FCLControllerVersion = 21
-	ZLEditorVersion      = 11
+	ZLEditorVersion      = 12
 	META_KEY             = "_control_byIQge报错别找我"
 	METASchemaVersion    = 1
 )

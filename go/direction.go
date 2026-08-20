@@ -211,3 +211,122 @@ func directionToZLButtons(
 	}
 	return buttons
 }
+
+// directionViewSize computes the pixel size of the square FCL direction view,
+// mirroring the Python direction_view_size (which mirrors fclDirectionRectToZLGrid).
+func directionViewSize(base *OrderedMap, aspect float64) int {
+	if toString(getOr(base, "sizeType", "")) == "ABSOLUTE" {
+		return maxInt(1, clampInt(getOr(base, "absoluteWidth", 50), 50))
+	}
+	screenH := 10000.0
+	screenW := screenH * math.Max(0.1, clampFloat(aspect, 16.0/9.0))
+	pw := getOrOrderedMap(base, "percentageWidth")
+	reference := toString(getOr(pw, "reference", "SCREEN_WIDTH"))
+	referenceSize := screenW
+	if reference == "SCREEN_HEIGHT" {
+		referenceSize = screenH
+	}
+	return maxInt(1, int(referenceSize*float64(clampInt(getOr(pw, "size", 100)))/1000.0))
+}
+
+// zlKeyEventsFromKeycodes converts a list of FCL keycodes to ZL key events.
+func zlKeyEventsFromKeycodes(keycodes []interface{}, strict bool) []*OrderedMap {
+	var events []*OrderedMap
+	for _, kc := range keycodes {
+		converted := convertKeyToZL(clampInt(kc), strict, false, "", nil)
+		if converted != nil {
+			events = append(events, NewOrderedMapFromPairs("type", converted.eventType, "key", converted.key))
+		}
+	}
+	return events
+}
+
+// directionToZLJoystick converts an FCL ROCKER direction control to a ZL joystick control.
+func directionToZLJoystick(
+	direction, style *OrderedMap,
+	joystickStyleUUID string,
+	strict bool,
+	aspect float64,
+) *OrderedMap {
+	base := getOrOrderedMap(direction, "baseInfo")
+	event := getOrOrderedMap(direction, "event")
+	grid := fclDirectionRectToZLGrid(direction, style, aspect, true)
+	absolute := toString(getOr(base, "sizeType", "")) == "ABSOLUTE"
+	viewSize := directionViewSize(base, aspect)
+
+	upKeys := directionEventKeycodes(event, "upKeycode", GLFWToFCL["GLFW_KEY_W"])
+	downKeys := directionEventKeycodes(event, "downKeycode", GLFWToFCL["GLFW_KEY_S"])
+	leftKeys := directionEventKeycodes(event, "leftKeycode", GLFWToFCL["GLFW_KEY_A"])
+	rightKeys := directionEventKeycodes(event, "rightKeycode", GLFWToFCL["GLFW_KEY_D"])
+	up := zlKeyEventsFromKeycodes(upKeys, strict)
+	down := zlKeyEventsFromKeycodes(downKeys, strict)
+	left := zlKeyEventsFromKeycodes(leftKeys, strict)
+	right := zlKeyEventsFromKeycodes(rightKeys, strict)
+
+	var sizeType string
+	var sizeDp float64
+	var sizePercentage int
+	if absolute {
+		sizeType = "Dp"
+		sizeDp = clampZLDP(viewSize)
+		sizePercentage = 2500
+	} else {
+		sizeType = "Percentage"
+		sizePercentage = maxInt(2000, minInt(10000, int(math.Round(float64(viewSize)/grid.screenH*10000))))
+		sizeDp = 200.0
+	}
+
+	joystickObj := NewOrderedMapFromPairs(
+		"uuid", shortID()+shortID()[:6],
+		"position", NewOrderedMapFromPairs(
+			"x", pixelToZLPosition(grid.widgetX, grid.screenW, float64(viewSize)),
+			"y", pixelToZLPosition(grid.widgetY, grid.screenH, float64(viewSize)),
+		),
+		"sizeType", sizeType,
+		"sizeDp", PyFloat(sizeDp),
+		"sizePercentage", sizePercentage,
+		"visibilityType", visibilityFCLToZL(toString(getOr(base, "visibilityType", ""))),
+		"joystickStyleId", joystickStyleUUID,
+		"deadZoneRatio", PyFloat(0.5),
+		"lockThreshold", PyFloat(0.3),
+		"canLock", true,
+		"triggerMode", "drag",
+		"directionEvents", NewOrderedMapFromPairs(
+			"north", eventsToInterface(up),
+			"north_east", eventsToInterface(appendEvents(up, right)),
+			"north_west", eventsToInterface(appendEvents(up, left)),
+			"south", eventsToInterface(down),
+			"south_east", eventsToInterface(appendEvents(down, right)),
+			"south_west", eventsToInterface(appendEvents(down, left)),
+			"east", eventsToInterface(right),
+			"west", eventsToInterface(left),
+		),
+		"lockEvents", []interface{}{},
+	)
+
+	originID := toString(getOr(direction, "id", toString(getOr(joystickObj, "uuid", ""))))
+	return setMeta(joystickObj, makeMeta(
+		"fcl",
+		"direction",
+		originID,
+		direction,
+		NewOrderedMapFromPairs("synthetic", true, "generatedFrom", "direction-joystick"),
+	))
+}
+
+// eventsToInterface converts []*OrderedMap to []interface{}.
+func eventsToInterface(events []*OrderedMap) []interface{} {
+	result := make([]interface{}, len(events))
+	for i, e := range events {
+		result[i] = e
+	}
+	return result
+}
+
+// appendEvents returns a new slice concatenating a and b (shallow copy).
+func appendEvents(a, b []*OrderedMap) []*OrderedMap {
+	result := make([]*OrderedMap, 0, len(a)+len(b))
+	result = append(result, a...)
+	result = append(result, b...)
+	return result
+}

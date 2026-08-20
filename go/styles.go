@@ -148,7 +148,9 @@ func defaultZLJoystickStyleConfig() *OrderedMap {
 // fclRockerStyleToZLJoystick converts FCL rocker style to ZL joystick style.
 func fclRockerStyleToZLJoystick(style *OrderedMap) *OrderedMap {
 	var rocker *OrderedMap
+	name := "Default"
 	if style != nil {
+		name = toString(getOr(style, "name", "Default"))
 		if r, ok := style.Get("rockerStyle"); ok {
 			if rm, ok := r.(*OrderedMap); ok && rm.Len() > 0 {
 				rocker = rm
@@ -167,7 +169,9 @@ func fclRockerStyleToZLJoystick(style *OrderedMap) *OrderedMap {
 	config.Set("joystickShape", fclRadiusToZLPercent(getOr(rocker, "rockerCornerRadius", 500)))
 	config.Set("joystickSize", PyFloat(fclRatioToZL(getOr(rocker, "rockerSize", 500))))
 	return NewOrderedMapFromPairs(
+		"name", name,
 		"uuid", shortID(),
+		"commonStyle", true,
 		"lightStyle", config,
 		"darkStyle", deepCopyJSON(config),
 	)

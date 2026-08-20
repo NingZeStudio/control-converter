@@ -33,16 +33,26 @@ func fclToZL(data *OrderedMap, includeDirections bool, strict bool, aspect float
 	}
 
 	layers := []*OrderedMap{}
-	var special *OrderedMap
+	joystickStyles := []interface{}{}
 	if rootOriginal != nil {
 		if ro, ok := rootOriginal.(*OrderedMap); ok {
-			if sp, ok := ro.Get("special"); ok {
-				special = deepCopyJSON(sp).(*OrderedMap)
+			if js, ok := ro.Get("joystickStyles"); ok {
+				if jsl, ok := js.([]interface{}); ok {
+					joystickStyles = deepCopyJSON(jsl).([]interface{})
+				}
 			}
 		}
 	}
-	if special == nil {
-		special = NewOrderedMap()
+	joystickStyleUUIDs := map[string]string{}
+	for _, item := range joystickStyles {
+		if js, ok := item.(*OrderedMap); ok {
+			name := toString(getOr(js, "name", ""))
+			if name != "" {
+				if _, exists := joystickStyleUUIDs[name]; !exists {
+					joystickStyleUUIDs[name] = toString(getOr(js, "uuid", ""))
+				}
+			}
+		}
 	}
 	warnedJoystickSettings := false
 
@@ -163,6 +173,7 @@ func fclToZL(data *OrderedMap, includeDirections bool, strict bool, aspect float
 
 		directions := getOrList(viewData, "directionList")
 		var directionButtons []*OrderedMap
+		var joystickButtons []*OrderedMap
 		if len(directions) > 0 && !includeDirections {
 			warn("skipped "+itoa(len(directions))+" FCL direction control(s) in group "+strconvQuote(toString(getOr(group, "name", "")))+"; use --include-directions to convert them", strict, false)
 		}
@@ -175,16 +186,24 @@ func fclToZL(data *OrderedMap, includeDirections bool, strict bool, aspect float
 				directionStyle := resolveDirectionStyle(direction, directionStyles)
 				isRocker := toString(getOr(directionStyle, "styleType", "")) == "ROCKER"
 				if isRocker {
-					if !special.Has("joystickStyle") {
-						special.Set("joystickStyle", fclRockerStyleToZLJoystick(directionStyle))
+					styleName := toString(getOr(directionStyle, "name", "Default"))
+					styleUUID := joystickStyleUUIDs[styleName]
+					if styleUUID == "" {
+						joystickStyle := fclRockerStyleToZLJoystick(directionStyle)
+						styleUUID = toString(getOr(joystickStyle, "uuid", ""))
+						joystickStyleUUIDs[styleName] = styleUUID
+						joystickStyle = setMeta(joystickStyle, makeMeta("fcl", "directionStyle", styleName, directionStyle))
+						joystickStyles = append(joystickStyles, joystickStyle)
 					}
 					if !warnedJoystickSettings {
-						warn("converted FCL ROCKER style to ZL special.joystickStyle and approximated rocker controls as 8-way button grid", strict, false)
+						warn("converted FCL ROCKER style to ZL joystickStyles and rocker controls to ZL joystickButtons (ZL editor v12)", strict, false)
 						warnedJoystickSettings = true
 					}
+					joystickButtons = append(joystickButtons, directionToZLJoystick(direction, directionStyle, styleUUID, strict, aspect))
+				} else {
+					directionButtons = append(directionButtons, directionToZLButtons(direction, directionStyle, defaultStyleUUID, strict, aspect, false)...)
 				}
 				substitutionCounts["directions"]++
-				directionButtons = append(directionButtons, directionToZLButtons(direction, directionStyle, defaultStyleUUID, strict, aspect, isRocker)...)
 			}
 		}
 
@@ -220,6 +239,7 @@ func fclToZL(data *OrderedMap, includeDirections bool, strict bool, aspect float
 		}
 		layerObj.Set("normalButtons", buttonsToInterface(buttons))
 		layerObj.Set("textBoxes", buttonsToInterface(textBoxes))
+		layerObj.Set("joystickButtons", buttonsToInterface(joystickButtons))
 
 		layerObj = setMeta(layerObj, makeMeta("fcl", "viewGroup", toString(getOr(group, "id", layerObj.GetMust("uuid"))), group))
 		layers = append(layers, layerObj)
@@ -300,9 +320,7 @@ func fclToZL(data *OrderedMap, includeDirections bool, strict bool, aspect float
 
 	result.Set("editorVersion", clampInt(getOr(result, "editorVersion", ZLEditorVersion), ZLEditorVersion))
 
-	if special.Len() > 0 {
-		result.Set("special", special)
-	}
+	result.Set("joystickStyles", joystickStyles)
 
 	resultID := toString(getOr(data, "id", ""))
 	if resultID == "" {
@@ -343,7 +361,7 @@ func buttonsToInterface(buttons []*OrderedMap) []interface{} {
 // normalizeZLLayout fills fields required by ZL models without changing semantics.
 func normalizeZLLayout(layout *OrderedMap) *OrderedMap {
 	result := deepCopyJSON(layout).(*OrderedMap)
-	result.SetIfAbsent("special", NewOrderedMap())
+	result.SetIfAbsent("joystickStyles", []interface{}{})
 	for _, item := range getOrList(result, "layers") {
 		layer, ok := item.(*OrderedMap)
 		if !ok {
@@ -354,6 +372,7 @@ func normalizeZLLayout(layout *OrderedMap) *OrderedMap {
 		layer.SetIfAbsent("hideWhenJoystick", false)
 		layer.SetIfAbsent("normalButtons", []interface{}{})
 		layer.SetIfAbsent("textBoxes", []interface{}{})
+		layer.SetIfAbsent("joystickButtons", []interface{}{})
 	}
 	return result
 }
