@@ -244,8 +244,10 @@ func minInt(a, b int) int {
 }
 
 // scalePositionToFCL: FCL uses 0..1000, ZL uses 0..10000.
+// Python uses clamp_int(clamp_int(value) / 10) which is float division + round,
+// so we must use float division here too (integer division would truncate).
 func scalePositionToFCL(value interface{}) int {
-	return maxInt(0, minInt(1000, clampInt(clampInt(value)/10)))
+	return maxInt(0, minInt(1000, clampInt(float64(clampInt(value))/10)))
 }
 
 // scalePositionToZL: FCL uses 0..1000, ZL uses 0..10000.
