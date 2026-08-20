@@ -279,8 +279,8 @@ func makeZLButtonSize(baseInfo *OrderedMap, absoluteAsPercentage bool, aspect fl
 	if toString(getOr(baseInfo, "sizeType", "")) == "ABSOLUTE" && absoluteAsPercentage {
 		screenHeightDP := 411.0
 		screenWidthDP := screenHeightDP * math.Max(0.1, clampFloat(aspect, 16.0/9.0))
-		widthPercentage := maxInt(100, minInt(10000, int(math.Round(clampZLDP(getOr(baseInfo, "absoluteWidth", 50))/screenWidthDP*10000))))
-		heightPercentage := maxInt(100, minInt(10000, int(math.Round(clampZLDP(getOr(baseInfo, "absoluteHeight", 50))/screenHeightDP*10000))))
+		widthPercentage := maxInt(100, minInt(10000, pyRound(clampZLDP(getOr(baseInfo, "absoluteWidth", 50))/screenWidthDP*10000)))
+		heightPercentage := maxInt(100, minInt(10000, pyRound(clampZLDP(getOr(baseInfo, "absoluteHeight", 50))/screenHeightDP*10000)))
 		return NewOrderedMapFromPairs(
 			"type", "percentage",
 			"widthDp", PyFloat(clampZLDP(getOr(baseInfo, "absoluteWidth", 50))),

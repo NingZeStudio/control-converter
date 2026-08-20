@@ -168,6 +168,27 @@ func toBool(v interface{}) bool {
 	return true
 }
 
+// pyRound implements Python's built-in round() semantics: round half to even
+// (banker's rounding), unlike Go's math.Round which rounds half away from zero.
+// Python round(0.5)=0, round(1.5)=2, round(2.5)=2, round(-0.5)=0, round(-1.5)=-2.
+func pyRound(f float64) int {
+	if math.IsNaN(f) || math.IsInf(f, 0) {
+		return 0
+	}
+	t := math.Trunc(f)
+	if math.Abs(f-t) == 0.5 {
+		// Round half to even.
+		if math.Mod(t, 2) == 0 {
+			return int(t)
+		}
+		if f >= 0 {
+			return int(t) + 1
+		}
+		return int(t) - 1
+	}
+	return int(math.Round(f))
+}
+
 // clampInt converts value to int (rounding), returns default on failure.
 func clampInt(value interface{}, defaultVal ...int) int {
 	def := 0
@@ -178,7 +199,7 @@ func clampInt(value interface{}, defaultVal ...int) int {
 	if !ok {
 		return def
 	}
-	return int(math.Round(f))
+	return pyRound(f)
 }
 
 // clampFloat converts value to float64, returns default on failure or non-finite.
@@ -359,7 +380,7 @@ func applyARGBAlpha(color int64, alpha interface{}) int64 {
 	}
 	argb := color & 0xFFFFFFFF
 	a := (argb >> 24) & 0xFF
-	a = int64(math.Max(0, math.Min(255, math.Round(float64(a)*alphaValue))))
+	a = int64(math.Max(0, math.Min(255, float64(pyRound(float64(a)*alphaValue)))))
 	return signedInt32((a << 24) | (argb & 0x00FFFFFF))
 }
 
@@ -758,8 +779,8 @@ func estimateWrapContentDP(widget *OrderedMap, styleName string, fclStyles []int
 			longest = n
 		}
 	}
-	width := maxInt(5, minInt(480, int(math.Round(float64(longest)*float64(fontSize)*0.62+8))))
-	height := maxInt(5, minInt(240, int(math.Round(float64(len(lines))*float64(fontSize)*1.25+6))))
+	width := maxInt(5, minInt(480, pyRound(float64(longest)*float64(fontSize)*0.62+8)))
+	height := maxInt(5, minInt(240, pyRound(float64(len(lines))*float64(fontSize)*1.25+6)))
 	return width, height
 }
 
