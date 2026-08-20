@@ -71,7 +71,7 @@ func fclDirectionRectToZLGrid(direction, style *OrderedMap, aspect float64, join
 		p2 = viewSize - childSize
 	}
 
-	childPercentage := maxInt(100, minInt(10000, int(math.Round(float64(childSize)/referenceSize*10000))))
+	childPercentage := maxInt(100, minInt(10000, pyRound(float64(childSize)/referenceSize*10000)))
 	var buttonSize *OrderedMap
 	if absolute {
 		buttonSize = NewOrderedMapFromPairs(
@@ -118,7 +118,7 @@ func fclRefNameToZL(reference string) string {
 
 func pixelToZLPosition(pixel int, screen, child float64) int {
 	available := math.Max(1.0, screen-child)
-	return maxInt(0, minInt(10000, int(math.Round(float64(pixel)/available*10000))))
+	return maxInt(0, minInt(10000, pyRound(float64(pixel)/available*10000)))
 }
 
 // directionEventKeycodes extracts keycodes for a direction event, with a default.

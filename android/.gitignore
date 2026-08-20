@@ -1,0 +1,10 @@
+.gradle/
+build/
+local.properties
+.idea/
+*.iml
+.DS_Store
+/captures
+
+# 本地测试二进制（由 rebuild_so.bat 生成，或从 dist/ 复制，不提交到仓库）
+app/src/main/jniLibs/
