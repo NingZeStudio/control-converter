@@ -43,7 +43,7 @@ Zalith Launcher 2 and FoldCraftLauncher use completely different JSON schemas fo
 - **Style mapping** -- bidirectional button style conversion (text, border, fill, corner radius, pressed state)
 - **Event translation** -- key presses, launcher events (scroll, IME toggle, menu), send_text, layer visibility toggles
 - **Layer preservation** -- ZL layers -> FCL view groups with group-level visibility and order
-- **Direction controls** -- FCL rocker/direction pad <-> ZL joystick + button grids
+- **Direction controls** -- FCL rocker <-> ZL native joystick (ZL editor v12); FCL direction pad <-> ZL button grids
 - **Roundtrip metadata** -- embeds `_control_converter` metadata in output so the original layout can be recovered
 
 Modes that can't map 1:1 use documented fallbacks with substitution tracking, printed to stderr.
@@ -82,7 +82,7 @@ python cc.py <mode> <input> <output> [options]
 
 | Flag | Effect |
 |------|--------|
-| `--include-directions` | Approximate FCL direction controls as ZL button grids |
+| `--include-directions` | Convert FCL direction controls: ROCKER -> ZL joystick, direction pad -> ZL button grids |
 | `--lossless` | Substitute unsupported controls instead of dropping them; also converts FCL directions |
 | `--absolute-as-percentage` | Convert FCL absolute dp sizes to ZL percentage sizes |
 | `--strict` | Fail on unsupported fields instead of warning |

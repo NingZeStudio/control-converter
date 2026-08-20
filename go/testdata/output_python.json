@@ -44,7 +44,7 @@
             "widthReference": "screen_width",
             "heightReference": "screen_width"
           },
-          "buttonStyle": "14a35d5232a2",
+          "buttonStyle": "145ef639eb1f",
           "textAlignment": "Left",
           "textBold": false,
           "textItalic": false,
@@ -143,6 +143,7 @@
         }
       ],
       "textBoxes": [],
+      "joystickButtons": [],
       "_control_byIQge报错别找我": {
         "schema": 1,
         "originFormat": "fcl",
@@ -249,7 +250,7 @@
             "default": "◤",
             "matchQueue": []
           },
-          "uuid": "857fa6d1597489e5a0",
+          "uuid": "7e197c73e1fa3cc9b1",
           "position": {
             "x": 769,
             "y": 2777
@@ -263,7 +264,7 @@
             "widthReference": "screen_width",
             "heightReference": "screen_width"
           },
-          "buttonStyle": "14a35d5232a2",
+          "buttonStyle": "145ef639eb1f",
           "textAlignment": "Left",
           "textBold": false,
           "textItalic": false,
@@ -332,7 +333,7 @@
             "default": "▲",
             "matchQueue": []
           },
-          "uuid": "1c3653fa792eabe0ca",
+          "uuid": "444a859ac4f4942e41",
           "position": {
             "x": 1922,
             "y": 2777
@@ -346,7 +347,7 @@
             "widthReference": "screen_width",
             "heightReference": "screen_width"
           },
-          "buttonStyle": "14a35d5232a2",
+          "buttonStyle": "145ef639eb1f",
           "textAlignment": "Left",
           "textBold": false,
           "textItalic": false,
@@ -411,7 +412,7 @@
             "default": "◥",
             "matchQueue": []
           },
-          "uuid": "58c3ab5303af8f5a0e",
+          "uuid": "f18bbf21328fb0b55a",
           "position": {
             "x": 3077,
             "y": 2777
@@ -425,7 +426,7 @@
             "widthReference": "screen_width",
             "heightReference": "screen_width"
           },
-          "buttonStyle": "14a35d5232a2",
+          "buttonStyle": "145ef639eb1f",
           "textAlignment": "Left",
           "textBold": false,
           "textItalic": false,
@@ -494,7 +495,7 @@
             "default": "◀",
             "matchQueue": []
           },
-          "uuid": "28f6b7bbf5f09e4cdb",
+          "uuid": "b087fd839a2694abb6",
           "position": {
             "x": 769,
             "y": 4997
@@ -508,7 +509,7 @@
             "widthReference": "screen_width",
             "heightReference": "screen_width"
           },
-          "buttonStyle": "14a35d5232a2",
+          "buttonStyle": "145ef639eb1f",
           "textAlignment": "Left",
           "textBold": false,
           "textItalic": false,
@@ -573,7 +574,7 @@
             "default": "▶",
             "matchQueue": []
           },
-          "uuid": "cb16e6ff93e984f4aa",
+          "uuid": "baa9cdaeac982cdc55",
           "position": {
             "x": 3077,
             "y": 4997
@@ -587,7 +588,7 @@
             "widthReference": "screen_width",
             "heightReference": "screen_width"
           },
-          "buttonStyle": "14a35d5232a2",
+          "buttonStyle": "145ef639eb1f",
           "textAlignment": "Left",
           "textBold": false,
           "textItalic": false,
@@ -652,7 +653,7 @@
             "default": "◣",
             "matchQueue": []
           },
-          "uuid": "014607dcc10d97e434",
+          "uuid": "6d26a071762e368108",
           "position": {
             "x": 769,
             "y": 7222
@@ -666,7 +667,7 @@
             "widthReference": "screen_width",
             "heightReference": "screen_width"
           },
-          "buttonStyle": "14a35d5232a2",
+          "buttonStyle": "145ef639eb1f",
           "textAlignment": "Left",
           "textBold": false,
           "textItalic": false,
@@ -735,7 +736,7 @@
             "default": "▼",
             "matchQueue": []
           },
-          "uuid": "e45f851c2723da5e40",
+          "uuid": "f3b63401bce493ceb4",
           "position": {
             "x": 1922,
             "y": 7222
@@ -749,7 +750,7 @@
             "widthReference": "screen_width",
             "heightReference": "screen_width"
           },
-          "buttonStyle": "14a35d5232a2",
+          "buttonStyle": "145ef639eb1f",
           "textAlignment": "Left",
           "textBold": false,
           "textItalic": false,
@@ -814,7 +815,7 @@
             "default": "◢",
             "matchQueue": []
           },
-          "uuid": "3d8504e4b95ee0d8fb",
+          "uuid": "c74fb887f86e8346d7",
           "position": {
             "x": 3077,
             "y": 7222
@@ -828,7 +829,7 @@
             "widthReference": "screen_width",
             "heightReference": "screen_width"
           },
-          "buttonStyle": "14a35d5232a2",
+          "buttonStyle": "145ef639eb1f",
           "textAlignment": "Left",
           "textBold": false,
           "textItalic": false,
@@ -911,7 +912,7 @@
             "widthReference": "screen_width",
             "heightReference": "screen_width"
           },
-          "buttonStyle": "14a35d5232a2",
+          "buttonStyle": "145ef639eb1f",
           "textAlignment": "Left",
           "textBold": false,
           "textItalic": false,
@@ -1027,7 +1028,7 @@
             "widthReference": "screen_width",
             "heightReference": "screen_width"
           },
-          "buttonStyle": "14a35d5232a2",
+          "buttonStyle": "145ef639eb1f",
           "textAlignment": "Left",
           "textBold": false,
           "textItalic": false,
@@ -1136,7 +1137,7 @@
             "widthReference": "screen_width",
             "heightReference": "screen_width"
           },
-          "buttonStyle": "e5b0357c2812",
+          "buttonStyle": "a28ce9bc9b9d",
           "textAlignment": "Left",
           "textBold": false,
           "textItalic": false,
@@ -1239,6 +1240,7 @@
         }
       ],
       "textBoxes": [],
+      "joystickButtons": [],
       "_control_byIQge报错别找我": {
         "schema": 1,
         "originFormat": "fcl",
@@ -1518,7 +1520,7 @@
   "styles": [
     {
       "name": "Default",
-      "uuid": "14a35d5232a2",
+      "uuid": "145ef639eb1f",
       "animateSwap": false,
       "commonStyle": true,
       "lightStyle": {
@@ -1576,7 +1578,7 @@
     },
     {
       "name": "Red",
-      "uuid": "e5b0357c2812",
+      "uuid": "a28ce9bc9b9d",
       "animateSwap": false,
       "commonStyle": true,
       "lightStyle": {
@@ -1633,7 +1635,8 @@
       }
     }
   ],
-  "editorVersion": 11,
+  "joystickStyles": [],
+  "editorVersion": 12,
   "_control_byIQge报错别找我": {
     "schema": 1,
     "originFormat": "fcl",
@@ -2067,6 +2070,5 @@
         }
       ]
     }
-  },
-  "special": {}
+  }
 }

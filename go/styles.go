@@ -125,7 +125,9 @@ func zlShapeToFCLRadius(shape interface{}) int {
 	for _, v := range values {
 		sum += v
 	}
-	return clampInt(sum/float64(len(values))*10, 100)
+	// FCL corner radius is 0..500 (500 = fully rounded); ZL shape is 0..100, so a
+	// ZL shape above 50 must be clamped to FCL's 500 maximum instead of overflowing.
+	return maxInt(0, minInt(500, clampInt(sum/float64(len(values))*10, 100)))
 }
 
 // defaultZLJoystickStyleConfig returns the default ZL joystick style config.
@@ -148,7 +150,9 @@ func defaultZLJoystickStyleConfig() *OrderedMap {
 // fclRockerStyleToZLJoystick converts FCL rocker style to ZL joystick style.
 func fclRockerStyleToZLJoystick(style *OrderedMap) *OrderedMap {
 	var rocker *OrderedMap
+	name := "Default"
 	if style != nil {
+		name = toString(getOr(style, "name", "Default"))
 		if r, ok := style.Get("rockerStyle"); ok {
 			if rm, ok := r.(*OrderedMap); ok && rm.Len() > 0 {
 				rocker = rm
@@ -167,7 +171,9 @@ func fclRockerStyleToZLJoystick(style *OrderedMap) *OrderedMap {
 	config.Set("joystickShape", fclRadiusToZLPercent(getOr(rocker, "rockerCornerRadius", 500)))
 	config.Set("joystickSize", PyFloat(fclRatioToZL(getOr(rocker, "rockerSize", 500))))
 	return NewOrderedMapFromPairs(
+		"name", name,
 		"uuid", shortID(),
+		"commonStyle", true,
 		"lightStyle", config,
 		"darkStyle", deepCopyJSON(config),
 	)
@@ -277,8 +283,8 @@ func makeZLButtonSize(baseInfo *OrderedMap, absoluteAsPercentage bool, aspect fl
 	if toString(getOr(baseInfo, "sizeType", "")) == "ABSOLUTE" && absoluteAsPercentage {
 		screenHeightDP := 411.0
 		screenWidthDP := screenHeightDP * math.Max(0.1, clampFloat(aspect, 16.0/9.0))
-		widthPercentage := maxInt(100, minInt(10000, int(math.Round(clampZLDP(getOr(baseInfo, "absoluteWidth", 50))/screenWidthDP*10000))))
-		heightPercentage := maxInt(100, minInt(10000, int(math.Round(clampZLDP(getOr(baseInfo, "absoluteHeight", 50))/screenHeightDP*10000))))
+		widthPercentage := maxInt(100, minInt(10000, pyRound(clampZLDP(getOr(baseInfo, "absoluteWidth", 50))/screenWidthDP*10000)))
+		heightPercentage := maxInt(100, minInt(10000, pyRound(clampZLDP(getOr(baseInfo, "absoluteHeight", 50))/screenHeightDP*10000)))
 		return NewOrderedMapFromPairs(
 			"type", "percentage",
 			"widthDp", PyFloat(clampZLDP(getOr(baseInfo, "absoluteWidth", 50))),
