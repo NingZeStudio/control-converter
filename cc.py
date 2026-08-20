@@ -1054,7 +1054,10 @@ def zl_shape_to_fcl_radius(shape: dict[str, Any] | None) -> int:
     # represent one radius for all four corners. Preserve the total amount of
     # rounding: one rounded ZL corner at 40dp becomes a uniform 10dp radius in FCL,
     # two rounded corners become 20dp, and four rounded corners stay 40dp.
-    return clamp_int(sum(values) / len(values) * 10, 100)
+    # FCL corner radius is 0..500 (500 = fully rounded); ZL shape is 0..100, so a
+    # ZL shape above 50 (e.g. 80, 100) must be clamped to FCL's 500 maximum
+    # instead of overflowing to 800/1000 (mirrors the joystick style reverse path).
+    return max(0, min(500, clamp_int(sum(values) / len(values) * 10, 100)))
 
 
 def signed_int32(value: int) -> int:

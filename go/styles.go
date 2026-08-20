@@ -125,7 +125,9 @@ func zlShapeToFCLRadius(shape interface{}) int {
 	for _, v := range values {
 		sum += v
 	}
-	return clampInt(sum/float64(len(values))*10, 100)
+	// FCL corner radius is 0..500 (500 = fully rounded); ZL shape is 0..100, so a
+	// ZL shape above 50 must be clamped to FCL's 500 maximum instead of overflowing.
+	return maxInt(0, minInt(500, clampInt(sum/float64(len(values))*10, 100)))
 }
 
 // defaultZLJoystickStyleConfig returns the default ZL joystick style config.
