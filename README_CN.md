@@ -33,6 +33,10 @@ cd control-converter
 
 **在线体验**: [cc.miawa.cn](https://cc.miawa.cn) -- 网页版转换工具。API 地址 [api.cc.miawa.cn](https://api.cc.miawa.cn)。
 
+## Android JNI 库
+
+`dist/libcc.so` 是 `cc.py` 的 Go 重写版本，编译为 Android aarch64 JNI 共享库。该 so **在 Android（arm64）环境中编译**（例如 Termux），Java 端通过 `System.loadLibrary("cc")` 加载。编译说明见 [BUILD.md](BUILD.md)。
+
 ## 它能做什么
 
 Zalith Launcher 2 和 FoldCraftLauncher 使用完全不同 JSON 架构来描述屏幕控件布局 -- 键码体系、颜色格式、尺寸单位、事件模型都不一样。这个工具负责两者之间的双向翻译：

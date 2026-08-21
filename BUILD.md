@@ -17,12 +17,30 @@ Java (LayoutConverter.java)
 
 ## 自行编译
 
-### 依赖
+### 方式一：Android 本机编译（Termux）
+
+在 Android 设备上的 [Termux](https://termux.dev/) 环境中直接编译，无需 Android NDK：
+
+```bash
+pkg install golang
+
+cd control-converter/go
+
+# Termux 自带 aarch64-linux-android-clang 与 jni.h，无需额外配置
+CGO_ENABLED=1 GOOS=android GOARCH=arm64 \
+  go build -buildmode=c-shared -o ../dist/libcc.so .
+```
+
+### 方式二：NDK 交叉编译（Windows / Linux / macOS）
+
+在 PC 上使用 Android NDK 交叉编译。
+
+#### 依赖
 
 - [Go 1.21+](https://go.dev/dl/)
 - [Android NDK r25+](https://developer.android.com/ndk/downloads)
 
-### 编译命令
+#### 编译命令
 
 ```bash
 cd control-converter/go
@@ -36,7 +54,8 @@ CGO_ENABLED=1 GOOS=android GOARCH=arm64 \
   go build -buildmode=c-shared -o ../dist/libcc.so .
 ```
 
-编译产物：
+### 编译产物
+
 - `dist/libcc.so` — Android aarch64 JNI 共享库
 - `dist/libcc.h` — C 头文件（JNI 函数声明，仅供参考）
 
