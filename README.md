@@ -1,11 +1,15 @@
 # control-converter
 
+[中文](README_CN.md)
+
 Convert control-layout JSON between [Zalith Launcher 2](https://github.com/ZalithLauncher/ZalithLauncher2) and [FoldCraftLauncher](https://github.com/FCL-Team/FoldCraftLauncher).
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.8%2B-blue)](https://www.python.org/)
 [![Demo](https://img.shields.io/badge/demo-cc.miawa.cn-9cf)](https://cc.miawa.cn)
 [![API](https://img.shields.io/badge/api-api.cc.miawa.cn-orange)](https://api.cc.miawa.cn)
+
+> **Note**: This tool was originally created by [iqisge-gif](https://github.com/iqisge-gif), who is no longer actively maintaining the converter. This repository continues its development.
 
 ## Quick Start
 

@@ -1,11 +1,15 @@
 # control-converter
 
+[English](README.md)
+
 在 [Zalith Launcher 2](https://github.com/ZalithLauncher/ZalithLauncher2) 和 [FoldCraftLauncher](https://github.com/FCL-Team/FoldCraftLauncher) 之间转换控件布局 JSON。
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.8%2B-blue)](https://www.python.org/)
 [![Demo](https://img.shields.io/badge/demo-cc.miawa.cn-9cf)](https://cc.miawa.cn)
 [![API](https://img.shields.io/badge/api-api.cc.miawa.cn-orange)](https://api.cc.miawa.cn)
+
+> **说明**：本工具最初由 [iqisge-gif](https://github.com/iqisge-gif) 编写，原作者现已不再维护此转换器，本仓库继续维护。
 
 ## 快速开始
 
