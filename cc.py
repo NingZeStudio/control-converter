@@ -1146,6 +1146,28 @@ def fcl_rocker_style_to_zl_joystick(style: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def fcl_button_style_to_zl_joystick(style: dict[str, Any]) -> dict[str, Any]:
+    """Convert an FCL BUTTON (cross key) direction style to a ZL joystick style."""
+    btn = (style or {}).get("buttonStyle") or {}
+    config = default_zl_joystick_style_config()
+    config.update({
+        "backgroundColor": fcl_argb_to_zl_color(btn.get("fillColor", 0x80000000)),
+        "joystickColor": fcl_argb_to_zl_color(btn.get("textColor", 0x80FFFFFF)),
+        "borderColor": fcl_argb_to_zl_color(btn.get("strokeColor", 0xFFFFFFFF)),
+        "borderWidthRatio": max(0, min(50, clamp_int(btn.get("strokeWidth", 10)) // 10)),
+        "backgroundShape": fcl_radius_to_zl_percent(btn.get("cornerRadius", 100)),
+        "joystickShape": fcl_radius_to_zl_percent(btn.get("cornerRadius", 100)),
+        "joystickSize": 0.5,
+    })
+    return {
+        "name": str((style or {}).get("name") or "Default"),
+        "uuid": short_id(),
+        "commonStyle": True,
+        "lightStyle": config,
+        "darkStyle": dict(config),
+    }
+
+
 def zl_joystick_style_to_fcl_rocker(style: dict[str, Any]) -> dict[str, Any]:
     """Convert a ZL joystick style back to an FCL rockerStyle (reverse of fcl_rocker_style_to_zl_joystick)."""
     light = (style or {}).get("lightStyle") or {}
@@ -2800,11 +2822,11 @@ def direction_to_zl_joystick(
     right = zl_key_events_from_keycodes(right_keys, strict)
 
     if absolute:
-        size_type = "Dp"
+        size_type = "dp"
         size_dp = clamp_zl_dp(view_size)
         size_percentage = 2500
     else:
-        size_type = "Percentage"
+        size_type = "percentage"
         size_percentage = max(2000, min(10000, round(view_size / screen_h * 10000)))
         size_dp = 200.0
 
@@ -2935,23 +2957,24 @@ def fcl_to_zl(data: dict[str, Any], include_directions: bool = False, strict: bo
             for direction in directions:
                 direction_style = resolve_direction_style(direction, direction_styles)
                 is_rocker = direction_style.get("styleType") == "ROCKER"
-                if is_rocker:
-                    style_name = str(direction_style.get("name") or "Default")
-                    style_uuid = joystick_style_uuids.get(style_name)
-                    if not style_uuid:
-                        joystick_style = fcl_rocker_style_to_zl_joystick(direction_style)
-                        style_uuid = joystick_style["uuid"]
-                        joystick_style_uuids[style_name] = style_uuid
-                        joystick_styles.append(set_meta(
-                            joystick_style,
-                            make_meta("fcl", "directionStyle", style_name, direction_style),
-                        ))
-                    if not warned_joystick_settings:
-                        warn("converted FCL ROCKER style to ZL joystickStyles and rocker controls to ZL joystickButtons (ZL editor v12)", strict)
-                        warned_joystick_settings = True
-                    joystick_buttons.append(direction_to_zl_joystick(direction, direction_style, style_uuid, strict, aspect))
-                else:
-                    direction_buttons.extend(direction_to_zl_buttons(direction, direction_style, default_style_uuid, strict, aspect, joined=False))
+                style_name = str(direction_style.get("name") or "Default")
+                style_uuid = joystick_style_uuids.get(style_name)
+                if not style_uuid:
+                    joystick_style = (
+                        fcl_rocker_style_to_zl_joystick(direction_style)
+                        if is_rocker
+                        else fcl_button_style_to_zl_joystick(direction_style)
+                    )
+                    style_uuid = joystick_style["uuid"]
+                    joystick_style_uuids[style_name] = style_uuid
+                    joystick_styles.append(set_meta(
+                        joystick_style,
+                        make_meta("fcl", "directionStyle", style_name, direction_style),
+                    ))
+                if not warned_joystick_settings:
+                    warn("converted FCL direction controls (ROCKER and BUTTON styles) to ZL joystickButtons and joystickStyles (ZL editor v12)", strict)
+                    warned_joystick_settings = True
+                joystick_buttons.append(direction_to_zl_joystick(direction, direction_style, style_uuid, strict, aspect))
                 _SUBSTITUTION_COUNTS["directions"] += 1
         buttons.sort(key=lambda button: fcl_button_area_ratio({"baseInfo": {
             "xPosition": (button.get("position") or {}).get("x", 0) / 10,

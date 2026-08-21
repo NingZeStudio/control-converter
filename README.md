@@ -33,6 +33,10 @@ No `pip install` needed. Just run `python cc.py`.
 
 **Try it online**: [cc.miawa.cn](https://cc.miawa.cn) -- web-based converter. API at [api.cc.miawa.cn](https://api.cc.miawa.cn).
 
+## Android JNI Library
+
+`dist/libcc.so` is a Go re-implementation of `cc.py`, built as an Android aarch64 JNI shared library. It is compiled **in an Android (arm64) environment** (e.g. Termux), then loaded from Java via `System.loadLibrary("cc")`. See [BUILD.md](BUILD.md) for build instructions.
+
 ## What It Does
 
 Zalith Launcher 2 and FoldCraftLauncher use completely different JSON schemas for their on-screen control layouts -- different key codes, color formats, size units, and event models. This tool translates between the two, handling:

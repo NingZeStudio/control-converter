@@ -267,11 +267,11 @@ func directionToZLJoystick(
 	var sizeDp float64
 	var sizePercentage int
 	if absolute {
-		sizeType = "Dp"
+		sizeType = "dp"
 		sizeDp = clampZLDP(viewSize)
 		sizePercentage = 2500
 	} else {
-		sizeType = "Percentage"
+		sizeType = "percentage"
 		sizePercentage = maxInt(2000, minInt(10000, int(math.Round(float64(viewSize)/grid.screenH*10000))))
 		sizeDp = 200.0
 	}

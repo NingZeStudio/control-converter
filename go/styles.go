@@ -179,6 +179,40 @@ func fclRockerStyleToZLJoystick(style *OrderedMap) *OrderedMap {
 	)
 }
 
+// fclButtonStyleToZLJoystick converts an FCL BUTTON (cross key) direction style
+// to a ZL joystick style, mapping the cross-key button colors/shape onto the
+// joystick background/border/knob so the visual survives the approximation.
+func fclButtonStyleToZLJoystick(style *OrderedMap) *OrderedMap {
+	var btn *OrderedMap
+	name := "Default"
+	if style != nil {
+		name = toString(getOr(style, "name", "Default"))
+		if b, ok := style.Get("buttonStyle"); ok {
+			if bm, ok := b.(*OrderedMap); ok && bm.Len() > 0 {
+				btn = bm
+			}
+		}
+	}
+	if btn == nil {
+		btn = NewOrderedMap()
+	}
+	config := defaultZLJoystickStyleConfig()
+	config.Set("backgroundColor", fclARGBToZLColor(getOr(btn, "fillColor", 0x80000000)))
+	config.Set("joystickColor", fclARGBToZLColor(getOr(btn, "textColor", 0x80FFFFFF)))
+	config.Set("borderColor", fclARGBToZLColor(getOr(btn, "strokeColor", 0xFFFFFFFF)))
+	config.Set("borderWidthRatio", maxInt(0, minInt(50, clampInt(getOr(btn, "strokeWidth", 10))/10)))
+	config.Set("backgroundShape", fclRadiusToZLPercent(getOr(btn, "cornerRadius", 100)))
+	config.Set("joystickShape", fclRadiusToZLPercent(getOr(btn, "cornerRadius", 100)))
+	config.Set("joystickSize", PyFloat(0.5))
+	return NewOrderedMapFromPairs(
+		"name", name,
+		"uuid", shortID(),
+		"commonStyle", true,
+		"lightStyle", config,
+		"darkStyle", deepCopyJSON(config),
+	)
+}
+
 // directionStyleMap builds a name->style map from a list of direction styles.
 func directionStyleMap(styles []interface{}) map[string]*OrderedMap {
 	result := map[string]*OrderedMap{}
