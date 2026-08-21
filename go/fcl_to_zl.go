@@ -26,12 +26,6 @@ func fclToZL(data *OrderedMap, includeDirections bool, strict bool, aspect float
 	}
 	directionStyles := directionStyleMap(dirStylesInput)
 
-	defaultStyleUUID := ""
-	for _, uuid := range styleMap {
-		defaultStyleUUID = uuid
-		break
-	}
-
 	layers := []*OrderedMap{}
 	joystickStyles := []interface{}{}
 	if rootOriginal != nil {
@@ -172,7 +166,6 @@ func fclToZL(data *OrderedMap, includeDirections bool, strict bool, aspect float
 		}
 
 		directions := getOrList(viewData, "directionList")
-		var directionButtons []*OrderedMap
 		var joystickButtons []*OrderedMap
 		if len(directions) > 0 && !includeDirections {
 			warn("skipped "+itoa(len(directions))+" FCL direction control(s) in group "+strconvQuote(toString(getOr(group, "name", "")))+"; use --include-directions to convert them", strict, false)
@@ -185,24 +178,25 @@ func fclToZL(data *OrderedMap, includeDirections bool, strict bool, aspect float
 				}
 				directionStyle := resolveDirectionStyle(direction, directionStyles)
 				isRocker := toString(getOr(directionStyle, "styleType", "")) == "ROCKER"
-				if isRocker {
-					styleName := toString(getOr(directionStyle, "name", "Default"))
-					styleUUID := joystickStyleUUIDs[styleName]
-					if styleUUID == "" {
-						joystickStyle := fclRockerStyleToZLJoystick(directionStyle)
-						styleUUID = toString(getOr(joystickStyle, "uuid", ""))
-						joystickStyleUUIDs[styleName] = styleUUID
-						joystickStyle = setMeta(joystickStyle, makeMeta("fcl", "directionStyle", styleName, directionStyle))
-						joystickStyles = append(joystickStyles, joystickStyle)
+				styleName := toString(getOr(directionStyle, "name", "Default"))
+				styleUUID := joystickStyleUUIDs[styleName]
+				if styleUUID == "" {
+					var joystickStyle *OrderedMap
+					if isRocker {
+						joystickStyle = fclRockerStyleToZLJoystick(directionStyle)
+					} else {
+						joystickStyle = fclButtonStyleToZLJoystick(directionStyle)
 					}
-					if !warnedJoystickSettings {
-						warn("converted FCL ROCKER style to ZL joystickStyles and rocker controls to ZL joystickButtons (ZL editor v12)", strict, false)
-						warnedJoystickSettings = true
-					}
-					joystickButtons = append(joystickButtons, directionToZLJoystick(direction, directionStyle, styleUUID, strict, aspect))
-				} else {
-					directionButtons = append(directionButtons, directionToZLButtons(direction, directionStyle, defaultStyleUUID, strict, aspect, false)...)
+					styleUUID = toString(getOr(joystickStyle, "uuid", ""))
+					joystickStyleUUIDs[styleName] = styleUUID
+					joystickStyle = setMeta(joystickStyle, makeMeta("fcl", "directionStyle", styleName, directionStyle))
+					joystickStyles = append(joystickStyles, joystickStyle)
 				}
+				if !warnedJoystickSettings {
+					warn("converted FCL direction controls (ROCKER and BUTTON styles) to ZL joystickButtons and joystickStyles (ZL editor v12)", strict, false)
+					warnedJoystickSettings = true
+				}
+				joystickButtons = append(joystickButtons, directionToZLJoystick(direction, directionStyle, styleUUID, strict, aspect))
 				substitutionCounts["directions"]++
 			}
 		}
@@ -213,9 +207,6 @@ func fclToZL(data *OrderedMap, includeDirections bool, strict bool, aspect float
 			ratioJ := zlButtonAreaRatio(buttons[j], aspect)
 			return ratioI > ratioJ
 		})
-
-		// Prepend direction buttons
-		buttons = append(directionButtons, buttons...)
 
 		// Build layer object
 		var layerObj *OrderedMap
