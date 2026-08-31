@@ -64,7 +64,7 @@ func fclEventToZLEvents(
 	strict bool,
 	label string,
 	eventName string,
-	groupIDsByName map[string]string,
+	groupIDsByName *groupIDMap,
 	substitutions *[]interface{},
 ) []*OrderedMap {
 	result := []*OrderedMap{}
@@ -175,9 +175,6 @@ func fclEventToZLEvents(
 		result = append(result, NewOrderedMapFromPairs("type", "send_text", "key", outputText))
 	}
 
-	if groupIDsByName == nil {
-		groupIDsByName = map[string]string{}
-	}
 	var bindGroups []string
 	for _, groupID := range getOrList(event, "bindViewGroup") {
 		bindGroups = append(bindGroups, toString(groupID))
@@ -185,7 +182,7 @@ func fclEventToZLEvents(
 
 	// Check if we should suppress chat layer
 	suppressChatLayer := false
-	chatID := groupIDsByName["聊天"]
+	chatID := groupIDsByName.get("聊天")
 	if chatID != "" {
 		hasKeyT := false
 		for _, item := range result {

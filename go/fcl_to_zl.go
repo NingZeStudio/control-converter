@@ -50,13 +50,13 @@ func fclToZL(data *OrderedMap, includeDirections bool, strict bool, aspect float
 	}
 	warnedJoystickSettings := false
 
-	groupIDsByName := map[string]string{}
+	groupIDsByName := newGroupIDMap()
 	for _, item := range getOrList(data, "viewGroups") {
 		if group, ok := item.(*OrderedMap); ok {
 			id := toString(getOr(group, "id", ""))
 			if id != "" {
 				name := toString(getOr(group, "name", "Layer"))
-				groupIDsByName[name] = id
+				groupIDsByName.insert(name, id)
 			}
 		}
 	}
@@ -309,9 +309,8 @@ func fclToZL(data *OrderedMap, includeDirections bool, strict bool, aspect float
 		result.Set("styles", deepCopyJSON(styles))
 	}
 
-	result.Set("editorVersion", clampInt(getOr(result, "editorVersion", ZLEditorVersion), ZLEditorVersion))
-
 	result.Set("joystickStyles", joystickStyles)
+	result.Set("editorVersion", clampInt(getOr(result, "editorVersion", ZLEditorVersion), ZLEditorVersion))
 
 	resultID := toString(getOr(data, "id", ""))
 	if resultID == "" {

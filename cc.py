@@ -857,12 +857,26 @@ def meta_kind(obj: Any) -> str | None:
     return str(kind) if isinstance(kind, str) else None
 
 
+_deterministic_counter = 0
+
+
+def _random_uuid() -> str:
+    """Deterministic UUID-like hex when CC_DETERMINISTIC is set (byte-diff testing
+    against the Go/Rust ports, which use the same counter scheme)."""
+    global _deterministic_counter
+    import os
+    if os.environ.get("CC_DETERMINISTIC"):
+        _deterministic_counter += 1
+        return "%016x%s" % (_deterministic_counter, "ab" * 8)
+    return uuid.uuid4().hex
+
+
 def short_id() -> str:
-    return uuid.uuid4().hex[:12]
+    return _random_uuid()[:12]
 
 
 def fcl_id() -> str:
-    return str(uuid.uuid4())
+    return str(uuid.UUID(_random_uuid()))
 
 
 def text_default(value: Any) -> str:
@@ -2511,7 +2525,7 @@ def fcl_button_to_zl_textbox(button: dict[str, Any], style_map: dict[str, str], 
         },
         "buttonSize": make_zl_button_size(base_info, absolute_as_percentage=absolute_as_percentage, aspect=aspect),
         "buttonStyle": style_map.get(str(button.get("style") or "Default")),
-        "textAlignment": "Left",
+        "textAlignment": "Center",
         "textBold": False,
         "textItalic": False,
         "textUnderline": False,
@@ -2591,7 +2605,7 @@ def fcl_button_to_zl(
         },
         "buttonSize": make_zl_button_size(base_info, absolute_as_percentage=absolute_as_percentage, aspect=aspect),
         "buttonStyle": style_map.get(str(visual_button.get("style") or button.get("style") or "Default")),
-        "textAlignment": "Left",
+        "textAlignment": "Center",
         "textBold": False,
         "textItalic": False,
         "textUnderline": False,
@@ -2750,7 +2764,7 @@ def direction_to_zl_buttons(
             },
             "buttonSize": deep_copy_json(button_size),
             "buttonStyle": style_uuid,
-            "textAlignment": "Left",
+            "textAlignment": "Center",
             "textBold": False,
             "textItalic": False,
             "textUnderline": False,
