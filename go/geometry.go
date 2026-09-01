@@ -10,6 +10,32 @@ type rect struct {
 	x1, y1, x2, y2 float64
 }
 
+// fclRectSize computes width/height for a percentage-size FCL button.
+// The //go:noinline directive prevents the Go compiler from fusing this
+// arithmetic into the caller's (screenW - width) subtraction with
+// higher-precision intermediates, which would break byte-level output
+// parity with the strict-IEEE Rust port (Go spec allows such fusion).
+//
+//go:noinline
+func fclRectSize(widthRef, heightRef, widthSize, heightSize float64) (float64, float64) {
+	w := math.Max(1.0, widthRef*widthSize/1000.0)
+	h := math.Max(1.0, heightRef*heightSize/1000.0)
+	return w, h
+}
+
+// fclRectOrigin computes the top-left origin of the button rect.
+// //go:noinline prevents the Go compiler from re-fusing the arithmetic with
+// the width/height computation at the call site (which would introduce
+// higher-precision intermediates and break byte-level output parity with
+// the strict-IEEE Rust port).
+//
+//go:noinline
+func fclRectOrigin(screenW, screenH, width, height, xPos, yPos float64) (float64, float64) {
+	x := (screenW - width) * xPos / 1000.0
+	y := (screenH - height) * yPos / 1000.0
+	return x, y
+}
+
 // fclButtonRect computes the screen rect of an FCL button.
 func fclButtonRect(button *OrderedMap, aspect float64) rect {
 	baseInfo := getOrOrderedMap(button, "baseInfo")
@@ -31,12 +57,22 @@ func fclButtonRect(button *OrderedMap, aspect float64) rect {
 		if toString(getOr(ph, "reference", "")) == "SCREEN_HEIGHT" {
 			heightRef = screenH
 		}
-		width = math.Max(1.0, widthRef*float64(clampInt(getOr(pw, "size", 50), 50))/1000.0)
-		height = math.Max(1.0, heightRef*float64(clampInt(getOr(ph, "size", 50), 50))/1000.0)
+		width, height = fclRectSize(
+			widthRef,
+			heightRef,
+			float64(clampInt(getOr(pw, "size", 50), 50)),
+			float64(clampInt(getOr(ph, "size", 50), 50)),
+		)
 	}
 
-	x := (screenW - width) * float64(clampInt(getOr(baseInfo, "xPosition", 0))) / 1000.0
-	y := (screenH - height) * float64(clampInt(getOr(baseInfo, "yPosition", 0))) / 1000.0
+	x, y := fclRectOrigin(
+		screenW,
+		screenH,
+		width,
+		height,
+		float64(clampInt(getOr(baseInfo, "xPosition", 0))),
+		float64(clampInt(getOr(baseInfo, "yPosition", 0))),
+	)
 	return rect{x, y, x + width, y + height}
 }
 
@@ -222,8 +258,35 @@ func inferableGridIndices(buttons []*OrderedMap) map[int]struct{} {
 	return result
 }
 
+// groupIDMap preserves name->id insertion order (matching Python dict
+// semantics) so that inference tie-breaking is deterministic.
+type groupIDMap struct {
+	order []groupIDEntry
+	index map[string]string
+}
+
+type groupIDEntry struct {
+	name string
+	id   string
+}
+
+func newGroupIDMap() *groupIDMap {
+	return &groupIDMap{index: map[string]string{}}
+}
+
+func (m *groupIDMap) insert(name, id string) {
+	if _, ok := m.index[name]; !ok {
+		m.order = append(m.order, groupIDEntry{name, id})
+	}
+	m.index[name] = id
+}
+
+func (m *groupIDMap) get(name string) string {
+	return m.index[name]
+}
+
 // inferEventsFromGroupNames infers switch_layer events from button text matching group names.
-func inferEventsFromGroupNames(button *OrderedMap, groupIDsByName map[string]string, groupName string) []*OrderedMap {
+func inferEventsFromGroupNames(button *OrderedMap, groupIDsByName *groupIDMap, groupName string) []*OrderedMap {
 	text := toString(getOr(button, "text", ""))
 	textWords := normalizedControlWords(text)
 	normalizedText := normalizedControlText(text)
@@ -233,7 +296,9 @@ func inferEventsFromGroupNames(button *OrderedMap, groupIDsByName map[string]str
 
 	var matches []groupMatch
 	groupPrefix := normalizedControlText(groupName)
-	for candidateName, groupID := range groupIDsByName {
+	for _, entry := range groupIDsByName.order {
+		candidateName := entry.name
+		groupID := entry.id
 		if groupID == "" || candidateName == groupName {
 			continue
 		}
@@ -341,14 +406,14 @@ func inferReciprocalLayerOpeners(data *OrderedMap, aspect float64) map[string]st
 	for i, group := range groups {
 		groupIndex[toString(getOr(group, "id", ""))] = i
 	}
-	groupIDsByName := map[string]string{}
+	groupIDsByName := newGroupIDMap()
 	for _, group := range groups {
 		id := toString(getOr(group, "id", ""))
 		if id == "" {
 			continue
 		}
 		name := toString(getOr(group, "name", "Layer"))
-		groupIDsByName[name] = id
+		groupIDsByName.insert(name, id)
 	}
 	targetsByGroupID := map[string]map[string]struct{}{}
 	for _, group := range groups {

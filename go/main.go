@@ -75,8 +75,28 @@ func indexByte(s string, c byte) int {
 	return -1
 }
 
-// main is required by c-shared build mode but never called.
-func main() {}
+// main is required by c-shared build mode but never called in that mode.
+// When invoked as a CLI with <input> <output> arguments it runs the same
+// conversion as the JNI entry (test/regression helper).
+func main() {
+	args := os.Args[1:]
+	if len(args) >= 2 {
+		source, err := loadJSONFile(args[0])
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "failed to read input file: %v\n", err)
+			os.Exit(1)
+		}
+		warnedMessages = map[string]struct{}{}
+		substitutionCounts = map[string]int{"keys": 0, "events": 0, "layers": 0, "directions": 0}
+		result := convertFCLToZL(source, false, false, 16.0/9.0, true, false)
+		if err := writeJSONFile(args[1], result, false); err != nil {
+			fmt.Fprintf(os.Stderr, "failed to write output file: %v\n", err)
+			os.Exit(1)
+		}
+		printSubstitutionSummary()
+		return
+	}
+}
 
 // --- JNI helper functions ---
 

@@ -2,6 +2,7 @@ package main
 
 import (
 	"crypto/rand"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -730,21 +731,36 @@ func metaKind(obj interface{}) string {
 	return ""
 }
 
-// shortID generates a 12-char hex ID (like uuid4().hex[:12]).
-func shortID() string {
+// randomBytes returns 16 random bytes, or deterministic sequence bytes when
+// CC_DETERMINISTIC is set (regression testing: identical IDs across Go/Rust).
+var deterministicCounter uint64
+
+func randomBytes() []byte {
+	if os.Getenv("CC_DETERMINISTIC") != "" {
+		deterministicCounter++
+		b := make([]byte, 16)
+		binary.BigEndian.PutUint64(b, deterministicCounter)
+		for i := 8; i < 16; i++ {
+			b[i] = 0xAB
+		}
+		return b
+	}
 	b := make([]byte, 16)
 	if _, err := rand.Read(b); err != nil {
 		panic(err)
 	}
+	return b
+}
+
+// shortID generates a 12-char hex ID (like uuid4().hex[:12]).
+func shortID() string {
+	b := randomBytes()
 	return fmt.Sprintf("%x", b)[:12]
 }
 
 // fclID generates a full UUID string.
 func fclID() string {
-	b := make([]byte, 16)
-	if _, err := rand.Read(b); err != nil {
-		panic(err)
-	}
+	b := randomBytes()
 	// Set version (4) and variant (RFC 4122)
 	b[6] = (b[6] & 0x0f) | 0x40
 	b[8] = (b[8] & 0x3f) | 0x80

@@ -1,39 +1,55 @@
 package com.tungsten.fcl.util;
 
-/**
- * JNI bridge to the Go implementation (go/main.go).
- *
- * The native symbol name is fixed by the Go c-shared build:
- *   Java_com_tungsten_fcl_util_LayoutConverter_convertFclToZl2Native
- *
- * The .so must be placed at jniLibs/arm64-v8a/libcc.so and is loaded
- * with System.loadLibrary("cc").
- */
+import android.os.Build;
+import java.io.File;
+
+/** JNI facade matching the upstream control-converter ABI. */
 public final class LayoutConverter {
+    private static final Throwable LOAD_ERROR;
 
     static {
-        System.loadLibrary("cc");
+        Throwable error = null;
+        try {
+            System.loadLibrary("cc");
+        } catch (Throwable t) {
+            error = t;
+        }
+        LOAD_ERROR = error;
     }
 
-    private LayoutConverter() {
+    private LayoutConverter() {}
+
+    public static boolean isSupported() {
+        if (LOAD_ERROR != null) return false;
+        for (String abi : Build.SUPPORTED_ABIS) {
+            if ("arm64-v8a".equals(abi)) return true;
+        }
+        return false;
     }
 
-    /**
-     * Native entry: convert an FCL control layout JSON to a ZL2 layout JSON.
-     *
-     * @param inputPath  absolute path of the FCL layout JSON file
-     * @param outputPath absolute path where the ZL2 JSON will be written
-     * @return null on success, or an error message on failure
-     */
+    public static Throwable loadFailure() {
+        return LOAD_ERROR;
+    }
+
+    /** JNI method exported by the latest control-converter libcc.so. */
     public static native String convertFclToZl2Native(String inputPath, String outputPath);
 
-    /**
-     * Convenience wrapper that throws on failure.
-     */
-    public static void convertFclToZl2(String inputPath, String outputPath) throws Exception {
-        String error = convertFclToZl2Native(inputPath, outputPath);
-        if (error != null) {
-            throw new RuntimeException("JNI conversion failed: " + error);
+    /** JNI method for ZL2 -> FCL conversion (added in the extended libcc.so). */
+    public static native String convertZl2ToFclNative(String inputPath, String outputPath);
+
+    public static String convertFclToZl2(File input, File output) {
+        if (!isSupported()) {
+            throw new IllegalStateException("官方 control-converter libcc.so 不可用：" +
+                    (LOAD_ERROR == null ? "仅支持 arm64-v8a" : LOAD_ERROR.getMessage()));
         }
+        return convertFclToZl2Native(input.getAbsolutePath(), output.getAbsolutePath());
+    }
+
+    public static String convertZl2ToFcl(File input, File output) {
+        if (!isSupported()) {
+            throw new IllegalStateException("官方 control-converter libcc.so 不可用：" +
+                    (LOAD_ERROR == null ? "仅支持 arm64-v8a" : LOAD_ERROR.getMessage()));
+        }
+        return convertZl2ToFclNative(input.getAbsolutePath(), output.getAbsolutePath());
     }
 }

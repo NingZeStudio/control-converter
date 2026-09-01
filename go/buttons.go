@@ -51,7 +51,7 @@ func fclButtonToZLTextbox(button *OrderedMap, styleMap map[string]string, absolu
 		),
 		"buttonSize", makeZLButtonSize(baseInfo, absoluteAsPercentage, aspect),
 		"buttonStyle", styleMap[toString(getOr(button, "style", "Default"))],
-		"textAlignment", "Left",
+		"textAlignment", "Center",
 		"textBold", false,
 		"textItalic", false,
 		"textUnderline", false,
@@ -66,7 +66,7 @@ func fclButtonToZL(
 	styleMap map[string]string,
 	strict bool,
 	groupName string,
-	groupIDsByName map[string]string,
+	groupIDsByName *groupIDMap,
 	visualButton *OrderedMap,
 	absoluteAsPercentage bool,
 	aspect float64,
@@ -91,9 +91,6 @@ func fclButtonToZL(
 	baseInfo := getOrOrderedMap(visualButton, "baseInfo")
 	eventRoot := getOrOrderedMap(button, "event")
 	text := toString(getOr(visualButton, "text", toString(getOr(button, "text", ""))))
-	if groupIDsByName == nil {
-		groupIDsByName = map[string]string{}
-	}
 
 	clickEvents := []*OrderedMap{}
 	var substitutions []interface{}
@@ -157,7 +154,7 @@ func fclButtonToZL(
 		),
 		"buttonSize", makeZLButtonSize(baseInfo, absoluteAsPercentage, aspect),
 		"buttonStyle", getStyleFromMap(styleMap, toString(getOr(visualButton, "style", toString(getOr(button, "style", "Default")))), nil),
-		"textAlignment", "Left",
+		"textAlignment", "Center",
 		"textBold", false,
 		"textItalic", false,
 		"textUnderline", false,

@@ -12,3 +12,12 @@ __pycache__/
 
 # Crash reports
 nuitka-crash-report.xml
+
+# Rust
+cc-rs/target/
+
+# Android (clc shell; see android/.gitignore too)
+android/build/
+android/.gradle/
+android/local.properties
+android/build_termux.sh.bak

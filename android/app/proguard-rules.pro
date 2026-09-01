@@ -1,4 +1,11 @@
-# Keep the JNI bridge class and its native methods.
--keep class com.tungsten.fcl.util.LayoutConverter {
-    public static native java.lang.String convertFclToZl2Native(java.lang.String, java.lang.String);
+# JavaScript bridge methods are invoked reflectively by WebView.
+-keepclassmembers class com.zhizhu.controlconverter.MainActivity$Bridge {
+    <methods>;
 }
+
+# Native converter entry points are resolved through JNI.
+-keep class com.tungsten.fcl.util.LayoutConverter { *; }
+-keep class com.zhizhu.controlconverter.OfficialConverter { *; }
+
+# Keep the Activity entry point and its lifecycle methods.
+-keep public class com.zhizhu.controlconverter.MainActivity { *; }

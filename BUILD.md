@@ -1,73 +1,91 @@
 # Binary Build Guide (Android JNI)
 
-`cc.py` 的转换逻辑已用 [Go](https://go.dev/) 重写，并通过 `c-shared` 构建模式编译为 Android aarch64 JNI 共享库 `dist/libcc.so`（约 4 MB）。
+`cc.py` 的转换逻辑现以 **Rust** 为主实现，编译为 Android aarch64 cdylib `dist/libcc.so`（约 745KB）。
+Go 版（`go/`，约 4.2MB）保留作回归参照，构建方式见文末。
 
-## 架构
+## 架构（Rust 主线）
 
 ```
 Java (LayoutConverter.java)
   └─ System.loadLibrary("cc")
      └─ JNI: Java_com_tungsten_fcl_util_LayoutConverter_convertFclToZl2Native
-        └─ Go: convertFCLToZL()  (fcl_to_zl.go)
+        └─ Rust: cc-rs/src/jni.rs → fcl_to_zl::convert_fcl_to_zl()
 ```
 
-- **入口**：`go/main.go` 中的 `//export` JNI 函数
-- **转换逻辑**：`go/fcl_to_zl.go`（从 `cc.py` 完整移植）
-- **输出**：与 Python 版 100% 一致
+- **入口**：`cc-rs/src/jni.rs`（jni crate 0.21）
+- **转换逻辑**：`cc-rs/src/`（自 `cc.py`/`go/` 完整移植，输出字节级一致）
+- 依赖：serde_json（preserve_order + arbitrary_precision）、ryu、getrandom、jni
 
-## 自行编译
+## 自行编译（Rust）
 
 ### 方式一：Android 本机编译（Termux）
 
-在 Android 设备上的 [Termux](https://termux.dev/) 环境中直接编译，无需 Android NDK：
+Termux 上 host==target（aarch64-android），无需 NDK：
 
 ```bash
-pkg install golang
+pkg install rust
 
-cd control-converter/go
-
-# Termux 自带 aarch64-linux-android-clang 与 jni.h，无需额外配置
-CGO_ENABLED=1 GOOS=android GOARCH=arm64 \
-  go build -buildmode=c-shared -o ../dist/libcc.so .
+cd control-converter/cc-rs
+cargo build --release
+# 产物: target/release/libcc.so
+cp target/release/libcc.so ../dist/libcc.so
 ```
 
-### 方式二：NDK 交叉编译（Windows / Linux / macOS）
+### 方式二：NDK 交叉编译（PC）
 
-在 PC 上使用 Android NDK 交叉编译。
+```bash
+# aarch64-linux-android21 目标 + cargo-ndk（或手动配 linker）
+rustup target add aarch64-linux-android
+cargo install cargo-ndk
+cd control-converter/cc-rs
+cargo ndk -t arm64-v8a -p 21 -- build --release
+```
 
-#### 依赖
+`[profile.release]` 已含 `opt-level="z" + lto + codegen-units=1 + strip`。
 
-- [Go 1.21+](https://go.dev/dl/)
-- [Android NDK r25+](https://developer.android.com/ndk/downloads)
+### CLI 测试工具
 
-#### 编译命令
+```bash
+cargo build --release --example convert
+CC_DETERMINISTIC=1 target/release/examples/convert <input.json> <output.json>
+```
+
+（`CC_DETERMINISTIC=1` 使生成的随机 ID 确定化，便于与 Go 版 `cmp` 字节对拍；
+正常部署/使用时无需设置。）
+
+### 回归验证
+
+```bash
+# 金样 + 真实布局对拍（需 CC_DETERMINISTIC=1，两侧 ID 序一致）
+cd go && go build -o /tmp/ccgo . && cd ..
+CC_DETERMINISTIC=1 /tmp/ccgo go/testdata/test_fcl_layout.json /tmp/out_go.json
+CC_DETERMINISTIC=1 cc-rs/target/release/examples/convert go/testdata/test_fcl_layout.json /tmp/out_rs.json
+cmp /tmp/out_go.json /tmp/out_rs.json && echo IDENTICAL
+```
+
+真实布局压测：`/sdcard/fcl/control/*.json`（见 AGENTS.md）。
+
+## Go 版（回归参照保留）
 
 ```bash
 cd control-converter/go
-
-# 设置 NDK 编译器路径（按实际 NDK 版本调整）
-export NDK_ROOT=/path/to/android-ndk
-export CC=$NDK_ROOT/toolchains/llvm/prebuilt/<host>/bin/aarch64-linux-android21-clang
-
-# 交叉编译 c-shared 库
 CGO_ENABLED=1 GOOS=android GOARCH=arm64 \
-  go build -buildmode=c-shared -o ../dist/libcc.so .
+  go build -buildmode=c-shared -o ../dist/libcc-go.so .
+# 或本机 CLI: go build -o /tmp/ccgo .
 ```
 
-### 编译产物
+注意：arm64 gc 会跨语句融合浮点（+1ulp 偏差），`go/geometry.go` 已用
+`//go:noinline`（fclRectSize/fclRectOrigin）打断以保持与 Rust 严格 IEEE 一致。
 
-- `dist/libcc.so` — Android aarch64 JNI 共享库
-- `dist/libcc.h` — C 头文件（JNI 函数声明，仅供参考）
+## 打包到 FCL
 
-### 打包到 FCL
-
-将 `dist/libcc.so` 复制到 FCL 项目的 jniLibs 目录：
+将 `dist/libcc.so`（Rust 版）复制到 FCL 项目的 jniLibs 目录：
 
 ```bash
 cp dist/libcc.so /path/to/FoldCraftLauncher/FCL/src/main/jniLibs/arm64-v8a/libcc.so
 ```
 
-Android 系统安装 APK 时会自动释放到 `nativeLibraryDir` 并赋予执行权限，Java 通过 `System.loadLibrary("cc")` 加载。
+Java 通过 `System.loadLibrary("cc")` 加载，接口与 Go 版完全相同。
 
 ## Python 版本
 

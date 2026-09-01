@@ -191,7 +191,7 @@ func directionToZLButtons(
 			),
 			"buttonSize", deepCopyJSON(grid.buttonSize),
 			"buttonStyle", styleUUID,
-			"textAlignment", "Left",
+			"textAlignment", "Center",
 			"textBold", false,
 			"textItalic", false,
 			"textUnderline", false,
