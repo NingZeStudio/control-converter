@@ -39,23 +39,6 @@ pub fn zl_button_area_ratio(button: &Value, aspect: f64) -> f64 {
             },
         },
     });
-    let debug = std::env::var_os("CC_DEBUG_RATIO").is_some();
-    if debug {
-        let base = get_or(&temp_button, "baseInfo", obj());
-        let r = crate::geometry::fcl_button_rect(&temp_button, aspect);
-        eprintln!(
-            "RECT xPosition={} yPosition={} sizeW={} x={} y={} w={} h={} x2x1={:.20e} y2y1={:.20e}",
-            to_string_v(&get_or(&base, "xPosition", Value::Null)),
-            to_string_v(&get_or(&base, "yPosition", Value::Null)),
-            to_string_v(&get_or(&get_or(&base, "percentageWidth", obj()), "size", Value::Null)),
-            r.x1,
-            r.y1,
-            r.x2 - r.x1,
-            r.y2 - r.y1,
-            r.x2 - r.x1,
-            r.y2 - r.y1,
-        );
-    }
     crate::geometry::fcl_button_area_ratio(&temp_button, aspect)
 }
 
@@ -418,9 +401,9 @@ pub fn fcl_to_zl(
         m.insert("editorVersion".to_string(), inum(editor_version));
     }
 
-    let mut result_id = to_string_v(&get_or(data, "id", json!("")));
+    let mut result_id = go_to_string(&get_or(data, "id", json!("")));
     if result_id.is_empty() {
-        result_id = to_string_v(&get_or(&get_or(&result, "info", obj()), "name", json!("")));
+        result_id = go_to_string(&get_or(&get_or(&result, "info", obj()), "name", json!("")));
     }
     if result_id.is_empty() {
         result_id = short_id();

@@ -190,6 +190,44 @@ pub fn to_string_v(v: &Value) -> String {
     }
 }
 
+// Go's fmt %v rendering of decoded JSON values. Go's OrderedMap prints as
+// "&{[k1 k2] map[k1:v1 k2:v2]}" (pointer-to-struct, map keys byte-sorted),
+// slices as "[a b]", nested values recursively. Only used on forward
+// (FCL->ZL2) paths where Go's toString is the byte-parity baseline.
+pub fn go_fmt_value(v: &Value) -> String {
+    match v {
+        Value::Null => "<nil>".to_string(),
+        Value::Bool(b) => if *b { "true" } else { "false" }.to_string(),
+        Value::Number(n) => n.to_string(),
+        Value::String(s) => s.clone(),
+        Value::Array(a) => {
+            let items: Vec<String> = a.iter().map(go_fmt_value).collect();
+            format!("[{}]", items.join(" "))
+        }
+        Value::Object(m) => {
+            let keys: Vec<&str> = m.keys().map(|k| k.as_str()).collect();
+            let mut entries: Vec<(&str, &Value)> = m.iter().map(|(k, val)| (k.as_str(), val)).collect();
+            entries.sort_by(|a, b| a.0.cmp(b.0));
+            let pairs: Vec<String> = entries
+                .iter()
+                .map(|(k, val)| format!("{}:{}", k, go_fmt_value(val)))
+                .collect();
+            format!("&{{[{}] map[{}]}}", keys.join(" "), pairs.join(" "))
+        }
+    }
+}
+
+// Mirrors Go's toString() branching: strings/bools/numbers/nil keep the
+// to_string_v semantics Go shares (bool renders Python-style "True"/"False"),
+// while objects/arrays fall through to fmt %v. Use this on forward paths
+// where a value might be a nested object (e.g. the translatable info name).
+pub fn go_to_string(v: &Value) -> String {
+    match v {
+        Value::Object(_) | Value::Array(_) => go_fmt_value(v),
+        other => to_string_v(other),
+    }
+}
+
 pub fn to_bool(v: &Value) -> bool {
     match v {
         Value::Null => false,
@@ -253,7 +291,9 @@ pub fn clamp_zl_border_width(value: &Value, default_val: i64) -> i64 {
 
 pub fn scale_position_to_fcl(value: &Value) -> i64 {
     let c = clamp_int(value, 0);
-    0.max(1000.min(clamp_int(&inum(c / 10), 0)))
+    // cc.py: clamp_int(clamp_int(value) / 10) — float division + banker's
+    // rounding (4999 -> 500), not integer truncation.
+    0.max(1000.min(py_round(c as f64 / 10.0)))
 }
 
 pub fn scale_position_to_zl(value: &Value) -> i64 {
@@ -708,10 +748,12 @@ pub fn short_id() -> String {
     b.iter().map(|x| format!("{:02x}", x)).collect::<String>()[..12].to_string()
 }
 
+// cc.py fcl_id() is str(uuid.UUID(hex)): the raw 128 bits are formatted without
+// touching the version/variant bits. Byte-parity for ZL2->FCL therefore requires
+// the same no-mangle scheme here; Go's fclID (which ORs the version bits in) is
+// forward-only and is never diffed against the reverse direction.
 pub fn fcl_id() -> String {
-    let mut b = random_bytes();
-    b[6] = (b[6] & 0x0f) | 0x40;
-    b[8] = (b[8] & 0x3f) | 0x80;
+    let b = random_bytes();
     let hex: Vec<String> = b.iter().map(|x| format!("{:02x}", x)).collect();
     format!(
         "{}-{}-{}-{}-{}",

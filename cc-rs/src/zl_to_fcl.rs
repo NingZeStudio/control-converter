@@ -4,7 +4,7 @@ use crate::styles::{
     zl_shape_to_fcl_radius,
 };
 use crate::utils::*;
-use serde_json::{json, Map, Value};
+use serde_json::{json, Value};
 use std::collections::{HashMap, HashSet};
 
 fn py_str(v: &Value) -> String {
@@ -957,6 +957,10 @@ fn zl_joystick_styles_to_fcl_direction_styles(
         }
         used_names.insert(py_str(&get_or(style, "name", Value::Null)));
     }
+    // cc.py builds a {name: style} dict (insertion order, last value wins per
+    // name) and iterates its values in first-insertion order; mirror that so
+    // tie-breaking between identical rocker styles stays deterministic.
+    let mut existing_rockers: Vec<(String, &Value)> = Vec::new();
     let mut existing_by_name: HashMap<String, &Value> = HashMap::new();
     for style in existing_styles {
         if !style.is_object() {
@@ -964,6 +968,13 @@ fn zl_joystick_styles_to_fcl_direction_styles(
         }
         let name = py_str(&get_or(style, "name", Value::Null));
         if to_string_v(&get_or(style, "styleType", json!(""))) == "ROCKER" {
+            if existing_by_name.contains_key(&name) {
+                if let Some(slot) = existing_rockers.iter_mut().find(|(n, _)| *n == name) {
+                    slot.1 = style;
+                }
+            } else {
+                existing_rockers.push((name.clone(), style));
+            }
             existing_by_name.insert(name, style);
         }
     }
@@ -997,10 +1008,10 @@ fn zl_joystick_styles_to_fcl_direction_styles(
             }
         }
         if matched_name.is_empty() {
-            for existing in existing_by_name.values() {
+            for (existing_name, existing) in &existing_rockers {
                 let rocker = existing.get("rockerStyle").cloned().unwrap_or(Value::Null);
                 if fcl_rocker_style_matches(&converted_rocker, &rocker) {
-                    matched_name = py_str(&get_or(existing, "name", Value::Null));
+                    matched_name = existing_name.clone();
                     break;
                 }
             }
