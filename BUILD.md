@@ -1,6 +1,6 @@
 # Binary Build Guide (Android JNI)
 
-`cc.py` 的转换逻辑现以 **Rust** 为主实现，编译为 Android aarch64 cdylib `dist/libcc.so`（约 745KB）。
+`cc.py` 的转换逻辑现以 **Rust** 为主实现，编译为 Android aarch64 cdylib `dist/libcc.so`（约 0.86MB，较 Go 版约 -79%；以实际构建为准）。
 Go 版（`go/`，约 4.2MB）保留作回归参照，构建方式见文末。
 
 ## 架构（Rust 主线）
@@ -31,6 +31,13 @@ cargo build --release
 cp target/release/libcc.so ../dist/libcc.so
 ```
 
+Termux 缺 build-tools 时，还需要把 aapt2 覆盖写到**用户级**配置
+`~/.gradle/gradle.properties`（勿提交进仓库，否则 PC/CI 构建会坏）：
+
+```
+android.aapt2FromMavenOverride=/data/data/com.termux/files/usr/bin/aapt2
+```
+
 ### 方式二：NDK 交叉编译（PC）
 
 ```bash
@@ -42,6 +49,13 @@ cargo ndk -t arm64-v8a -p 21 -- build --release
 ```
 
 `[profile.release]` 已含 `opt-level="z" + lto + codegen-units=1 + strip`。
+
+### Android 壳工程签名（android/）
+
+release 签名凭据只来自环境变量（`KEYSTORE_PATH` / `KEYSTORE_PASSWORD` /
+`KEY_ALIAS` / `KEY_PASSWORD`）或本地 `android/release.keystore`（已被
+.gitignore 排除）。凭据不齐时不挂接签名，`assembleRelease` 产出 unsigned
+APK；仓库内不含任何密钥口令。
 
 ### CLI 测试工具
 

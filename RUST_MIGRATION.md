@@ -11,7 +11,7 @@
 
 | 指标 | Go 版 | Rust 版（实测） |
 |---|---|---|
-| libcc.so 体积 | 4,221,184 B | 745,512 B（-82%） |
+| libcc.so 体积 | 4,221,184 B | 约 0.86MB（-79%，随功能演进以实际构建为准） |
 | JNI 接口 | 不变 | 不变（Java 侧零改动） |
 | 转换输出 | — | 金样 + 5 个真实布局字节级一致 |
 | 依赖 | Go runtime | serde_json / ryu / getrandom / jni |
@@ -166,7 +166,7 @@ pub extern "system" fn Java_com_tungsten_fcl_util_LayoutConverter_convertFclToZl
 
 ## 五、验证策略（回归测试）
 
-金样文件已存在且字节级稳定：`go/testdata/output_go.json` == `output_python.json`（65396 B）。
+金样：`go/testdata/output_go.json`（与现行 lossless=true Go 输出一致）；`output_python.json` 为旧参数遗留历史参照。
 
 ```bash
 # 1. Rust 版转换测试输入
