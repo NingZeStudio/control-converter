@@ -20,17 +20,25 @@ android {
         versionName = "2.0"
     }
 
+    // 签名配置：从环境变量读取（CI 用 GitHub Secret 注入），或使用本地
+    // android/release.keystore（不入库，见 .gitignore）。凭据不齐全时
+    // 不挂接签名，assembleRelease 产出 unsigned APK，避免把密钥写进仓库。
+    val ksPath = System.getenv("KEYSTORE_PATH")
+    val ksPass = System.getenv("KEYSTORE_PASSWORD")
+    val keyAlias = System.getenv("KEY_ALIAS")
+    val keyPass = System.getenv("KEY_PASSWORD")
+    val ksFile = if (!ksPath.isNullOrBlank()) file(ksPath) else rootProject.file("release.keystore")
+    val releaseSigningReady =
+        !ksPass.isNullOrBlank() && !keyAlias.isNullOrBlank() && !keyPass.isNullOrBlank() && ksFile.exists()
+
     signingConfigs {
-        create("release") {
-            // 签名配置：优先读取 CI 环境变量（GitHub Secret 注入），否则回退到本地 release.keystore。
-            val ksPath = System.getenv("KEYSTORE_PATH")
-            val ksPass = System.getenv("KEYSTORE_PASSWORD")
-            val keyAlias = System.getenv("KEY_ALIAS")
-            val keyPass = System.getenv("KEY_PASSWORD")
-            storeFile = if (!ksPath.isNullOrBlank()) file(ksPath) else rootProject.file("release.keystore")
-            storePassword = ksPass ?: "zhizhu0001"
-            this.keyAlias = keyAlias ?: "zhizhu0001"
-            keyPassword = keyPass ?: "zhizhu0001"
+        if (releaseSigningReady) {
+            create("release") {
+                storeFile = ksFile
+                storePassword = ksPass
+                this.keyAlias = keyAlias
+                keyPassword = keyPass
+            }
         }
     }
 
@@ -42,7 +50,9 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            signingConfig = signingConfigs.getByName("release")
+            if (releaseSigningReady) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
 
